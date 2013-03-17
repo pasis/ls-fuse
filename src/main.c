@@ -205,24 +205,42 @@ static void node_set_mode(lsnode_t *node, const char * const mode)
 static void node_set_usr(lsnode_t *node, const char * const owner)
 {
 	struct passwd *pwd;
+	char *endptr;
+	long uid;
 
 	assert(owner != NULL);
 
 	pwd = getpwnam(owner);
 	if (pwd) {
 		node->uid = pwd->pw_uid;
+	} else {
+		/* if owner is numeric */
+		uid = strtol(owner, &endptr, 10);
+		assert(endptr != NULL);
+		if (*endptr == '\0') {
+			node->uid = uid;
+		}
 	}
 }
 
 static void node_set_grp(lsnode_t *node, const char * const group)
 {
 	struct group *grp;
+	char *endptr;
+	long gid;
 
 	assert(group != NULL);
 
 	grp = getgrnam(group);
 	if (grp) {
 		node->gid = grp->gr_gid;
+	} else {
+		/* if group is numeric */
+		gid = strtol(group, &endptr, 10);
+		assert(endptr != NULL);
+		if (*endptr == '\0') {
+			node->gid = gid;
+		}
 	}
 }
 
