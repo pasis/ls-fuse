@@ -2,6 +2,8 @@
 #include <sys/stat.h>
 #include <sys/mman.h>
 #include <fcntl.h>
+#include <grp.h>
+#include <pwd.h>
 #include <unistd.h>
 
 #include <assert.h>
@@ -17,6 +19,7 @@
 
 #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
 
+/* maximum number of regex matches */
 #define MATCH_NUM 10
 
 struct lsnode {
@@ -41,6 +44,8 @@ typedef void (*handler_t)(lsnode_t *, const char *);
 
 static void node_set_type(lsnode_t *, const char *);
 static void node_set_mode(lsnode_t *, const char *);
+static void node_set_usr(lsnode_t *, const char *);
+static void node_set_grp(lsnode_t *, const char *);
 static void node_set_size(lsnode_t *, const char *);
 static void node_set_name(lsnode_t *, const char *);
 
@@ -57,7 +62,8 @@ static char lsreg_str[] =
 	"([1-3]?[0-9][ \t]+[0-2]?[0-9]:[0-5][0-9]|[1-3]?[0-9][ \t]+[0-9]{4,4})"
 	"[ \t]+(.+)$";
 static handler_t lsreg_tbl[MATCH_NUM] = {NULL, &node_set_type, &node_set_mode,
-	NULL, NULL, &node_set_size, NULL, NULL, &node_set_name,};
+	&node_set_usr, &node_set_grp, &node_set_size, NULL, NULL,
+	&node_set_name,};
 
 
 /*
@@ -194,6 +200,30 @@ static void node_set_mode(lsnode_t *node, const char * const mode)
 	}
 
 	node->mode |= st_mode;
+}
+
+static void node_set_usr(lsnode_t *node, const char * const owner)
+{
+	struct passwd *pwd;
+
+	assert(owner != NULL);
+
+	pwd = getpwnam(owner);
+	if (pwd) {
+		node->uid = pwd->pw_uid;
+	}
+}
+
+static void node_set_grp(lsnode_t *node, const char * const group)
+{
+	struct group *grp;
+
+	assert(group != NULL);
+
+	grp = getgrnam(group);
+	if (grp) {
+		node->gid = grp->gr_gid;
+	}
 }
 
 static void node_set_size(lsnode_t *node, const char * const size)
@@ -442,6 +472,8 @@ static int fuse_getattr(const char *path, struct stat *stbuf)
 	stbuf->st_nlink = 1;
 	stbuf->st_size = node->size;
 	stbuf->st_rdev = node->rdev;
+	stbuf->st_uid = node->uid;
+	stbuf->st_gid = node->gid;
 
 	return 0;
 }
