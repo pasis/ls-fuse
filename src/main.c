@@ -5,6 +5,7 @@
 #include <unistd.h>
 
 #include <assert.h>
+#include <errno.h>
 #include <fuse.h>
 #include <regex.h>
 #include <stdio.h>
@@ -214,7 +215,10 @@ static lsnode_t *node_from_path(const char * const path)
 	tok = strtok_r(tmp, "/", &saveptr);
 
 	while (tok) {
-		if (*tok != '\0') {
+		if (*tok == '\0' || strcmp(tok, ".") == 0) {
+			/* do nothing, parent remains the same */
+			/* TODO: handle '..' in path (doubly linked list?) */
+		} else {
 			node = parent->entry;
 			found = 0;
 			while (node) {
@@ -279,6 +283,38 @@ static void parse_line(char *s, const regex_t *reg, const handler_t h_tbl[])
 	}
 }
 
+static int is_dir(const char * const s)
+{
+	size_t len;
+
+	assert(s != NULL);
+
+	len = strlen(s);
+	if (len < 2) {
+		return 0;
+	}
+
+	if ((s[0] == '/' || s[0] == '.') && s[len - 1] == ':') {
+		return 1;
+	}
+
+	return 0;
+}
+
+static int chcwd(const char * const path)
+{
+	lsnode_t *node;
+
+	node = node_from_path(path);
+	if (!node) {
+		/* TODO: create all nodes with standard values for a dir */
+		return ERR;
+	}
+
+	cwd = node;
+	return OK;
+}
+
 static int parse(const char *buf, size_t size)
 {
 	size_t i = 0;
@@ -298,12 +334,19 @@ static int parse(const char *buf, size_t size)
 	regcomp(&lsreg, lsreg_str, REG_EXTENDED);
 
 	while (i < size) {
+		/* TODO: move get next str logic to a separated function */
 		if (buf[i] == '\n' || buf[i] == '\r' || i == size - 1) {
 			len = i - last;
 			if (len > 0 && len < sizeof(s)) {
 				strncpy(s, &buf[last], len);
 				s[len] = '\0';
-				parse_line(s, &lsreg, lsreg_tbl);
+				if (is_dir(s)) {
+					/* remove last ':' */
+					s[len - 1] = '\0';
+					chcwd(s);
+				} else {
+					parse_line(s, &lsreg, lsreg_tbl);
+				}
 			}
 			last = i + 1;
 		}
