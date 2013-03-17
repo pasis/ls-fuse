@@ -41,6 +41,7 @@ typedef void (*handler_t)(lsnode_t *, const char *);
 
 static void node_set_type(lsnode_t *, const char *);
 static void node_set_mode(lsnode_t *, const char *);
+static void node_set_size(lsnode_t *, const char *);
 static void node_set_name(lsnode_t *, const char *);
 
 static lsnode_t root = {
@@ -56,7 +57,7 @@ static char lsreg_str[] =
 	"([1-3]?[0-9][ \t]+[0-2]?[0-9]:[0-5][0-9]|[1-3]?[0-9][ \t]+[0-9]{4,4})"
 	"[ \t]+(.+)$";
 static handler_t lsreg_tbl[MATCH_NUM] = {NULL, &node_set_type, &node_set_mode,
-	NULL, NULL, NULL, NULL, NULL, &node_set_name,};
+	NULL, NULL, &node_set_size, NULL, NULL, &node_set_name,};
 
 
 /*
@@ -193,6 +194,33 @@ static void node_set_mode(lsnode_t *node, const char * const mode)
 	}
 
 	node->mode |= st_mode;
+}
+
+static void node_set_size(lsnode_t *node, const char * const size)
+{
+	char *endptr = NULL;
+	long st_size;
+
+	assert(size != NULL);
+
+	st_size = strtol(size, &endptr, 10);
+	assert(endptr != NULL);
+
+	if (*endptr == '\0') {
+		node->size = st_size;
+	} else if (*endptr == ',') {
+		/* assume this is major, minor */
+		/* TODO: handle incorrect strings */
+		if (st_size < (1 << 8)) {
+			node->rdev = st_size << 8;
+			st_size = strtol(endptr + 1, NULL, 10);
+			if (st_size < (1 << 8)) {
+				node->rdev |= st_size;
+			} else {
+				node->rdev = 0;
+			}
+		}
+	}
 }
 
 static void node_set_name(lsnode_t *node, const char * const name)
@@ -413,6 +441,7 @@ static int fuse_getattr(const char *path, struct stat *stbuf)
 	stbuf->st_mode = node->mode;
 	stbuf->st_nlink = 1;
 	stbuf->st_size = node->size;
+	stbuf->st_rdev = node->rdev;
 
 	return 0;
 }
