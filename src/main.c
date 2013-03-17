@@ -407,8 +407,7 @@ static int fuse_getattr(const char *path, struct stat *stbuf)
 
 	node = node_from_path(path);
 	if (!node) {	
-		/* TODO: return error */
-		return 0;
+		return -ENOENT;
 	}
 
 	stbuf->st_mode = node->mode;
@@ -424,19 +423,25 @@ static int fuse_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 	lsnode_t *parent;
 	lsnode_t *node;
 
-	filler(buf, ".", NULL, 0);
-	filler(buf, "..", NULL, 0);
-
 	parent = node_from_path(path);
 	if (!parent) {
-		/* TODO: return error */
-		return 0;
+		return -ENOENT;
+	}
+	if (!(parent->mode & S_IFDIR)) {
+		return -ENOTDIR;
+	}
+
+	if (filler(buf, ".", NULL, 0) == 1 ||
+	    filler(buf, "..", NULL, 0) == 1) {
+		return -EINVAL;
 	}
 
 	node = parent->entry;
 	while (node) {
 		if (node->name) {
-			filler(buf, node->name, NULL, 0);
+			if (filler(buf, node->name, NULL, 0) == 1) {
+				return -EINVAL;
+			}
 		}
 		node = node->next;
 	}
