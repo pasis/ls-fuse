@@ -76,7 +76,7 @@ static regex_t lsreg;
 static char lsreg_str[] =
 	"^([-bcdlpsS])([-rwxs]{9,9})[ \t]+[0-9]+[ \t]+([0-9A-Za-z]+)[ \t]+"
 	"([0-9A-Za-z]+)[ \t]+([0-9]+|[0-9]+,[ \t]+[0-9]+)[ \t]+([^ \t]+)[ \t]+"
-	"([1-3]?[0-9][ \t]+[0-2]?[0-9]:[0-5][0-9]|[1-3]?[0-9][ \t]+[0-9]{4,4})"
+	"([1-3]?[0-9][ \t]+[0-9]{4,4}|[1-3]?[0-9][ \t]+[0-2]?[0-9]:[0-5][0-9])"
 	"[ \t]+(.+)$";
 static handler_t lsreg_tbl[MATCH_NUM] = {NULL, &node_set_type, &node_set_mode,
 	&node_set_usr, &node_set_grp, &node_set_size, NULL, NULL,
