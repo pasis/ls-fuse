@@ -295,6 +295,8 @@ static lsnode_t *node_from_path(const char * const path)
 		if (strcmp(tok, ".") == 0) {
 			/* do nothing, parent remains the same */
 			/* TODO: handle '..' in path (doubly linked list?) */
+		} else if (strcmp(tok, "..") == 0) {
+			/* TODO: not implemented yet */
 		} else {
 			node = parent->entry;
 			found = 0;
