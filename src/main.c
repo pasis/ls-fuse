@@ -278,6 +278,7 @@ static void node_set_name(lsnode_t *node, const char * const name)
 	node->name = strdup(name);
 }
 
+/* node_from_path must be thread safe */
 static lsnode_t *node_from_path(const char * const path)
 {
 	lsnode_t *parent;
@@ -291,7 +292,7 @@ static lsnode_t *node_from_path(const char * const path)
 	tok = strtok_r(tmp, "/", &saveptr);
 
 	while (tok) {
-		if (*tok == '\0' || strcmp(tok, ".") == 0) {
+		if (strcmp(tok, ".") == 0) {
 			/* do nothing, parent remains the same */
 			/* TODO: handle '..' in path (doubly linked list?) */
 		} else {
