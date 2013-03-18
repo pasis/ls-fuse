@@ -9,11 +9,14 @@ This is on early stage of development!
 At the moment you can try it out in the following way:
 
 	cd src && make
-	ls --color=never -l > test.txt
+	ls --color=never -lR > test.txt
 	mkdir mnt
 	./a.out test.txt mnt
 
-After that mnt/ will contain (I hope) files described in test.txt.
+After that mnt/ will contain (I hope) files described in test.txt. The
+following command will unmount fs:
+
+	fusermount -u mnt
 
 ## For future
 
