@@ -17,6 +17,13 @@
 #define ERR 1
 #define OK 0
 
+#ifndef FALSE
+#define FALSE 0
+#endif /* FALSE */
+#ifndef TRUE
+#define TRUE 1
+#endif /* TRUE */
+
 #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
 
 /* maximum number of regex matches */
@@ -55,6 +62,16 @@ static lsnode_t root = {
 };
 static lsnode_t *cwd = &root;
 
+/* lsreg - regex for ls -l and ls -lR */
+/* 1 - file type
+ * 2 - file mode (rwx)
+ * 3 - owner
+ * 4 - group
+ * 5 - size or major, minor
+ * 6 - month
+ * 7 - day and time or day and year
+ * 8 - file name
+ */
 static regex_t lsreg;
 static char lsreg_str[] =
 	"^([-bcdlpsS])([-rwxs]{9,9})[ \t]+[0-9]+[ \t]+([0-9A-Za-z]+)[ \t]+"
@@ -294,15 +311,14 @@ static lsnode_t *node_from_path(const char * const path)
 	while (tok) {
 		if (strcmp(tok, ".") == 0) {
 			/* do nothing, parent remains the same */
-			/* TODO: handle '..' in path (doubly linked list?) */
 		} else if (strcmp(tok, "..") == 0) {
-			/* TODO: not implemented yet */
+			/* TODO: not implemented yet (doubly linked list?) */
 		} else {
 			node = parent->entry;
-			found = 0;
+			found = FALSE;
 			while (node) {
 				if (node->name && !strcmp(tok, node->name)) {
-					found = 1;
+					found = TRUE;
 					parent = node;
 					break;
 				}
@@ -323,7 +339,7 @@ static lsnode_t *node_from_path(const char * const path)
 	return parent;
 }
 
-static void parse_line(char *s, const regex_t *reg, const handler_t h_tbl[])
+static int parse_line(char *s, const regex_t *reg, const handler_t h_tbl[])
 {
 	regmatch_t match[MATCH_NUM];
 	int i;
@@ -332,34 +348,37 @@ static void parse_line(char *s, const regex_t *reg, const handler_t h_tbl[])
 	char tmp[len + 1];
 	lsnode_t *node;
 
-	printf("parsing: %s\n", s);
+	printf("parsing: %s\n", s); /* debug */
 
 	if (regexec(reg, s, MATCH_NUM, match, 0) == REG_NOMATCH ) {
-		/* TODO: return ERR */
-		return;
+		return ERR;
 	}
 
 	node = node_alloc();
 	if (!node) {
-		/* TODO: return ERR */
-		return;
+		return ERR;
 	}
 
-	for(i = 1; i < MATCH_NUM; i++) {
+	for (i = 1; i < MATCH_NUM; i++) {
 		if (match[i].rm_so >= 0 && match[i].rm_eo >= match[i].rm_so) {
+			/* TODO: after debug removing make tmp string only
+			 *       when h_tbl[i] != NULL
+			 */
 			sub_len = match[i].rm_eo - match[i].rm_so;
 			if (sub_len > len) {
 				continue;
 			}
 			strncpy(tmp, &s[match[i].rm_so], sub_len);
 			tmp[sub_len] = '\0';
-			printf("%d: %s\n", i, tmp);
+			printf("%d: %s\n", i, tmp); /* debug */
 
 			if (h_tbl[i] != NULL) {
 				h_tbl[i](node, tmp);
 			}
 		}
 	}
+
+	return OK;
 }
 
 static int is_dir(const char * const s)
@@ -370,14 +389,14 @@ static int is_dir(const char * const s)
 
 	len = strlen(s);
 	if (len < 2) {
-		return 0;
+		return FALSE;
 	}
 
-	if ((s[0] == '/' || s[0] == '.') && s[len - 1] == ':') {
-		return 1;
+	if (s[len - 1] == ':') {
+		return TRUE;
 	}
 
-	return 0;
+	return FALSE;
 }
 
 static int chcwd(const char * const path)
@@ -394,42 +413,49 @@ static int chcwd(const char * const path)
 	return OK;
 }
 
-static int parse(const char *buf, size_t size)
+static char *get_next_line(const char *buf, size_t size, char *s, size_t len)
 {
-	size_t i = 0;
-	size_t last = 0;
-	size_t len;
-	char s[1024];
+	static size_t last;
+	size_t i;
+	size_t tmp_len;
+	const char *tmp_ptr;
 
-	/* 1 - file type
-	 * 2 - file mode (rwx)
-	 * 3 - owner
-	 * 4 - group
-	 * 5 - size or major, minor
-	 * 6 - month
-	 * 7 - day and time or day and year
-	 * 8 - file name
-	 */
-	regcomp(&lsreg, lsreg_str, REG_EXTENDED);
+	i = last;
 
 	while (i < size) {
-		/* TODO: move get next str logic to a separated function */
 		if (buf[i] == '\n' || buf[i] == '\r' || i == size - 1) {
-			len = i - last;
-			if (len > 0 && len < sizeof(s)) {
-				strncpy(s, &buf[last], len);
-				s[len] = '\0';
-				if (is_dir(s)) {
-					/* remove last ':' */
-					s[len - 1] = '\0';
-					chcwd(s);
-				} else {
-					parse_line(s, &lsreg, lsreg_tbl);
-				}
-			}
+			tmp_len = i - last;
+			tmp_ptr = &buf[last];
 			last = i + 1;
+			if (tmp_len > 0 && tmp_len < len) {
+				strncpy(s, tmp_ptr, tmp_len);
+				s[tmp_len] = '\0';
+				return s;
+			}
 		}
 		i++;
+	}
+
+	return NULL;
+}
+
+static int parse(const char *buf, size_t size)
+{
+	size_t len;
+	int err;
+	char s[1024];
+
+	regcomp(&lsreg, lsreg_str, REG_EXTENDED);
+
+	while (get_next_line(buf, size, s, sizeof(s))) {
+		err = parse_line(s, &lsreg, lsreg_tbl);
+
+		if (err == ERR && is_dir(s)) {
+			/* remove last ':' */
+			len = strlen(s);
+			s[len - 1] = '\0';
+			chcwd(s);
+		}
 	}
 
 	regfree(&lsreg);
