@@ -36,6 +36,7 @@ struct lsnode {
 	off_t size;
 	dev_t rdev;
 	char *name;
+	char *data;
 	struct lsnode *next;
 	struct lsnode *entry;
 };
@@ -290,9 +291,31 @@ static void node_set_size(lsnode_t *node, const char * const size)
 
 static void node_set_name(lsnode_t *node, const char * const name)
 {
+	char *sub;
+	char *tmp;
+	size_t len;
+
 	assert(name != NULL);
 
-	node->name = strdup(name);
+	if ((node->mode & S_IFLNK) == S_IFLNK) {
+		#define LNK_DELIM " -> "
+		sub = strstr(name, LNK_DELIM);
+		if (sub) {
+			len = sub - name;
+			tmp = (char *)malloc(len + 1);
+			memcpy(tmp, name, len);
+			tmp[len] = '\0';
+			node->name = tmp;
+			tmp = sub + strlen(LNK_DELIM);
+			if (*tmp != '\0') {
+				node->data = strdup(tmp);
+			}
+		} else {
+			node->name = strdup(name);
+		}
+	} else {
+		node->name = strdup(name);
+	}
 }
 
 /* node_from_path must be thread safe */
@@ -557,9 +580,37 @@ static int fuse_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 	return 0;
 }
 
+static int fuse_readlink(const char *path, char *buf, size_t size)
+{
+	lsnode_t *node;
+	size_t len;
+
+	node = node_from_path(path);
+	if (!node) {
+		return -ENOENT;
+	}
+	if ((node->mode & S_IFLNK) != S_IFLNK) {
+		return -EINVAL;
+	}
+	if (!node->data) {
+		return -EIO;
+	}
+
+	len = strlen(node->data);
+	if (len >= size) {
+		return -EFAULT;
+	}
+
+	memcpy(buf, node->data, len);
+	buf[len] = '\0';
+
+	return 0;
+}
+
 static struct fuse_operations fuse_oper = {
 	.getattr = fuse_getattr,
 	.readdir = fuse_readdir,
+	.readlink = fuse_readlink,
 };
 
 int main(int argc, char **argv)
