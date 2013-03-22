@@ -13,6 +13,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #define ERR 1
 #define OK 0
@@ -37,6 +38,8 @@ struct lsnode {
 	gid_t gid;
 	off_t size;
 	dev_t rdev;
+	int month;
+	time_t time;
 	char *name;
 	char *data;
 	struct lsnode *next;
@@ -48,8 +51,14 @@ struct hash8 {
 	int val;
 };
 
+struct hash_str {
+	char *key;
+	int val;
+};
+
 typedef struct lsnode lsnode_t;
 typedef struct hash8 hash8_t;
+typedef struct hash_str hash_str_t;
 typedef void (*handler_t)(lsnode_t *, const char *);
 
 static void node_set_type(lsnode_t *, const char *);
@@ -57,6 +66,8 @@ static void node_set_mode(lsnode_t *, const char *);
 static void node_set_usr(lsnode_t *, const char *);
 static void node_set_grp(lsnode_t *, const char *);
 static void node_set_size(lsnode_t *, const char *);
+static void node_set_month(lsnode_t *, const char *);
+static void node_set_time(lsnode_t *, const char *);
 static void node_set_name(lsnode_t *, const char *);
 
 static lsnode_t root = {
@@ -82,8 +93,8 @@ static char lsreg_str[] =
 	"([1-3]?[0-9][ \t]+[0-9]{4,4}|[1-3]?[0-9][ \t]+[0-2]?[0-9]:[0-5][0-9])"
 	"[ \t]+(.+)$";
 static handler_t lsreg_tbl[MATCH_NUM] = {NULL, &node_set_type, &node_set_mode,
-	&node_set_usr, &node_set_grp, &node_set_size, NULL, NULL,
-	&node_set_name,};
+	&node_set_usr, &node_set_grp, &node_set_size, &node_set_month,
+	&node_set_time, &node_set_name,};
 
 
 /*
@@ -289,6 +300,87 @@ static void node_set_size(lsnode_t *node, const char * const size)
 			}
 		}
 	}
+}
+
+static void node_set_month(lsnode_t *node, const char * const month)
+{
+	static hash_str_t month_tbl[] = {
+		{"Jan", 0},
+		{"Feb", 1},
+		{"Mar", 2},
+		{"Apr", 3},
+		{"May", 4},
+		{"Jun", 5},
+		{"Jul", 6},
+		{"Aug", 7},
+		{"Sep", 8},
+		{"Oct", 9},
+		{"Nov", 10},
+		{"Dec", 11},
+	};
+
+	int i;
+
+	assert(month != NULL);
+
+	for (i = 0; i < ARRAY_SIZE(month_tbl); i++) {
+		if (strcmp(month, month_tbl[i].key) == 0) {
+			node->month = month_tbl[i].val;
+			break;
+		}
+	}
+}
+
+static void node_set_time(lsnode_t *node, const char * const time2)
+{
+	struct tm t;
+	time_t unix_time;
+	char *tmp_time;
+	char *tmp_part;
+	size_t len;
+
+	assert(time2 != NULL);
+
+	if (time(&unix_time) == (time_t)-1) {
+		return;
+	}
+
+	if (localtime_r(&unix_time, &t) == NULL) {
+		return;
+	}
+
+	tmp_time = strdup(time2);
+	tmp_part = strtok(tmp_time, " ");
+	if (!tmp_part) {
+		goto out;
+	}
+
+	t.tm_mday = atoi(tmp_part);
+	tmp_part = strtok(NULL, " ");
+	if (!tmp_part) {
+		goto out;
+	}
+
+	len = strlen(tmp_part);
+	if (len == 5 && tmp_part[2] == ':') {
+		tmp_part[2] = '\0';
+		t.tm_hour = atoi(tmp_part);
+		t.tm_min = atoi(&tmp_part[3]);
+	} else if (len == 4) {
+		t.tm_year = atoi(tmp_part);
+	} else {
+		goto out;
+	}
+
+	/* assume month is set before */
+	t.tm_mon = node->month;
+	unix_time = mktime(&t);
+	if (unix_time >= 0) {
+		node->time = unix_time;
+	}
+
+out:
+	free(tmp_time);
 }
 
 static void node_set_name(lsnode_t *node, const char * const name)
@@ -546,6 +638,7 @@ static int fuse_getattr(const char *path, struct stat *stbuf)
 	stbuf->st_rdev = node->rdev;
 	stbuf->st_uid = node->uid;
 	stbuf->st_gid = node->gid;
+	stbuf->st_mtime = node->time;
 
 	return 0;
 }
