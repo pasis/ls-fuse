@@ -29,6 +29,8 @@
 /* maximum number of regex matches */
 #define MATCH_NUM 10
 
+#define SELINUX_XATTR "security.selinux"
+
 struct lsnode {
 	mode_t mode;
 	uid_t uid;
@@ -607,10 +609,41 @@ static int fuse_readlink(const char *path, char *buf, size_t size)
 	return 0;
 }
 
+static int fuse_listxattr(const char *path, char *buf, size_t size)
+{
+	(void)path;
+
+	if (size < sizeof(SELINUX_XATTR)) {
+		return -ERANGE;
+	}
+
+	strcpy(buf, SELINUX_XATTR);
+
+	return sizeof(SELINUX_XATTR);
+}
+
+static int fuse_getxattr(const char *path, const char *name, char *buf,
+			 size_t size)
+{
+	/* TODO: remove after implementation */
+	(void)path;
+	(void)buf;
+
+	if (strcmp(name, SELINUX_XATTR) != 0) {
+		/* ENOATTR is a synonym for ENODATA */
+		return -ENODATA;
+	}
+
+	/* TODO: not implemented, just return error */
+	return -ENODATA;
+}
+
 static struct fuse_operations fuse_oper = {
 	.getattr = fuse_getattr,
 	.readdir = fuse_readdir,
 	.readlink = fuse_readlink,
+	.listxattr = fuse_listxattr,
+	.getxattr = fuse_getxattr,
 };
 
 int main(int argc, char **argv)
