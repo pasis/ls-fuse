@@ -1,0 +1,5 @@
+ls-fuse is a 'ls -lR' output mounter
+Copyright (C) 2013 Dmitry Podgorny <pasis.ua@gmail.com>
+
+This program is licensed under the GPL license version 3 or later.
+Please follow the link http://www.gnu.org/licenses/gpl.html for details.
