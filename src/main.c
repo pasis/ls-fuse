@@ -338,6 +338,7 @@ static void node_set_time(lsnode_t *node, const char * const time2)
 	char *tmp_time;
 	char *tmp_part;
 	size_t len;
+	int year;
 
 	assert(time2 != NULL);
 
@@ -367,7 +368,12 @@ static void node_set_time(lsnode_t *node, const char * const time2)
 		t.tm_hour = atoi(tmp_part);
 		t.tm_min = atoi(&tmp_part[3]);
 	} else if (len == 4) {
-		t.tm_year = atoi(tmp_part);
+		year = atoi(tmp_part);
+		if (year >= 1970) {
+			t.tm_year = year - 1900;
+		} else {
+			goto out;
+		}
 	} else {
 		goto out;
 	}
