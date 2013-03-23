@@ -471,7 +471,9 @@ static int parse_line(char *s, const regex_t *reg, const handler_t h_tbl[])
 	char tmp[len + 1];
 	lsnode_t *node;
 
+#ifdef DEBUG
 	printf("parsing: %s\n", s); /* debug */
+#endif /* DEBUG */
 
 	if (regexec(reg, s, MATCH_NUM, match, 0) == REG_NOMATCH ) {
 		return ERR;
@@ -493,7 +495,10 @@ static int parse_line(char *s, const regex_t *reg, const handler_t h_tbl[])
 			}
 			strncpy(tmp, &s[match[i].rm_so], sub_len);
 			tmp[sub_len] = '\0';
+
+#ifdef DEBUG
 			printf("%d: %s\n", i, tmp); /* debug */
+#endif /* DEBUG */
 
 			if (h_tbl[i] != NULL) {
 				h_tbl[i](node, tmp);
@@ -737,6 +742,14 @@ static int fuse_getxattr(const char *path, const char *name, char *buf,
 	return -ENODATA;
 }
 
+static void usage(const char *name)
+{
+#ifdef PACKAGE_STRING
+	printf(PACKAGE_STRING "\n\n");
+#endif /* PACKAGE_STRING */
+	printf("Usage: %s <FILE> [FUSE_OPTIONS] <MOUNT_POINT>\n", name);
+}
+
 static struct fuse_operations fuse_oper = {
 	.getattr = fuse_getattr,
 	.readdir = fuse_readdir,
@@ -747,10 +760,12 @@ static struct fuse_operations fuse_oper = {
 
 int main(int argc, char **argv)
 {
-	if (argc < 2) {
+	if (argc < 3) {
+		usage(argv[0]);
 		return 1;
 	}
 	if (process_file(argv[1]) != OK) {
+		fprintf(stderr, "Unrecognized file format!\n");
 		return 1;
 	}
 	return fuse_main(argc - 1, argv + 1, &fuse_oper);
