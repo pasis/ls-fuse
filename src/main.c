@@ -732,6 +732,56 @@ static int fuse_readlink(const char *path, char *buf, size_t size)
 	return 0;
 }
 
+static int fuse_open(const char *path, struct fuse_file_info *fi)
+{
+	lsnode_t *node;
+
+	node = node_from_path(path);
+	if (!node) {
+		return -ENOENT;
+	}
+
+	if ((fi->flags & O_WRONLY) == O_WRONLY) {
+		return -EACCES;
+	}
+
+	/* TODO: create and cache data if node->data is NULL */
+
+	return 0;
+}
+
+static int fuse_read(const char *path, char *buf, size_t size, off_t offset,
+		      struct fuse_file_info *fi)
+{
+	lsnode_t *node;
+	size_t len;
+	char *ptr;
+
+	node = node_from_path(path);
+	if (!node) {
+		return -EIO;
+	}
+
+	if (!node->data) {
+		return -EINVAL;
+	}
+
+	len = strlen(node->data);
+	if (offset > len) {
+		return -EFAULT;
+	}
+
+	ptr = &node->data[offset];
+	len = len - offset;
+	if (len > size) {
+		len = size;
+	}
+
+	memcpy(buf, ptr, len);
+
+	return len;
+}
+
 static int fuse_listxattr(const char *path, char *buf, size_t size)
 {
 	(void)path;
@@ -773,6 +823,8 @@ static struct fuse_operations fuse_oper = {
 	.getattr = fuse_getattr,
 	.readdir = fuse_readdir,
 	.readlink = fuse_readlink,
+	.open = fuse_open,
+	.read = fuse_read,
 	.listxattr = fuse_listxattr,
 	.getxattr = fuse_getxattr,
 };
