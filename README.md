@@ -46,7 +46,7 @@ following command will unmount fs:
 ## KNOWN ISSUES
 
 * getxattr for security.selinux extended attribute doesn't pass to ls-fuse.
-  Instead, genfscon rule is used. (Tested on Fedora 18).
+  Instead, genfscon rule is used. (Tested on Fedora 17).
 
 ## For future
 
