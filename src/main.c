@@ -729,12 +729,13 @@ static int fuse_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 {
 	lsnode_t *parent;
 	lsnode_t *node;
+	char *name;
 
 	parent = node_from_path(path);
 	if (!parent) {
 		return -ENOENT;
 	}
-	if (!(parent->mode & S_IFDIR)) {
+	if ((parent->mode & S_IFDIR) != S_IFDIR) {
 		return -ENOTDIR;
 	}
 
@@ -745,7 +746,9 @@ static int fuse_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 
 	node = parent->entry;
 	while (node) {
-		if (node->name) {
+		name = node->name;
+		if (name != NULL && strcmp(name, ".") != 0 &&
+		    strcmp(name, "..") != 0) {
 			if (filler(buf, node->name, NULL, 0) == 1) {
 				return -EINVAL;
 			}

@@ -4,6 +4,7 @@ ls-fuse mounts output of 'ls -lR', 'ls -lRZ' or 'ls -l' as a pseudo filesystem.
 
 Supported output of ls with options:
 
+* -a (optional)
 * -l (mandatory)
 * -R (optional)
 * -s (optional)
