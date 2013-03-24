@@ -59,6 +59,7 @@ struct lsnode {
 	dev_t rdev;
 	int month;
 	time_t time;
+	char *selinux;
 	char *name;
 	char *data;
 	struct lsnode *next;
@@ -87,6 +88,7 @@ static void node_set_grp(lsnode_t *, const char *);
 static void node_set_size(lsnode_t *, const char *);
 static void node_set_month(lsnode_t *, const char *);
 static void node_set_time(lsnode_t *, const char *);
+static void node_set_selinux(lsnode_t *, const char *);
 static void node_set_name(lsnode_t *, const char *);
 
 static lsnode_t root = {
@@ -108,13 +110,27 @@ static lsnode_t *cwd = &root;
 static regex_t lsreg;
 static char lsreg_str[] =
 	"^[ \t]*[0-9]*[ \t]*([-bcdlps])([-rwxsS]{9,9})[t@+.]?[ \t]+[0-9]+[ \t]+"
-	"([0-9A-Za-z]+)[ \t]+([0-9A-Za-z]+)[ \t]+([0-9]+|[0-9]+,[ \t]+[0-9]+)"
+	"([0-9A-Za-z_-]+)[ \t]+([0-9A-Za-z_-]+)[ \t]+([0-9]+|[0-9]+,[ \t]+[0-9]+)"
 	"[ \t]+([^ \t]+)[ \t]+([1-3]?[0-9][ \t]+[0-9]{4,4}|[1-3]?[0-9][ \t]+"
 	"[0-2]?[0-9]:[0-5][0-9])[ \t]+(.+)$";
-static handler_t lsreg_tbl[MATCH_NUM] = {NULL, &node_set_type, &node_set_mode,
-	&node_set_usr, &node_set_grp, &node_set_size, &node_set_month,
-	&node_set_time, &node_set_name,};
+static handler_t lsreg_tbl[MATCH_NUM] = {NULL, node_set_type, node_set_mode,
+	node_set_usr, node_set_grp, node_set_size, node_set_month,
+	node_set_time, node_set_name,};
 
+/* lsregx - regex for ls -lZ and ls -lRZ */
+/* 1 - file type
+ * 2 - file mode (rwx)
+ * 3 - owner
+ * 4 - group
+ * 5 - selinux context
+ * 6 - file name
+ */
+static regex_t lsregx;
+static char lsregx_str[] =
+	"([-bcdlps])([-rwxsS]{9,9})[t@+.]?[ \t]+([0-9A-Za-z_-]+)[ \t]+"
+	"([0-9A-Za-z_-]+)[ \t]+([0-9a-zA-Z:_.-]+)[ \t]+(.+)$";
+static handler_t lsregx_tbl[MATCH_NUM] = {NULL, node_set_type, node_set_mode,
+	node_set_usr, node_set_grp, node_set_selinux, node_set_name,};
 
 /*
 static int process_file(const char *file)
@@ -165,6 +181,11 @@ static void node_free(lsnode_t *node)
 }
 */
 
+/* TODO: functions node_set_xxx must be refactored to support multiple files.
+ *       now pointers are just set without checking, but they can be set before
+ *       while previous file parsing - this will cause memory leaks.
+ */
+
 static void node_set_type(lsnode_t *node, const char * const type)
 {
 	static hash8_t type_map[] = {
@@ -197,6 +218,8 @@ static void node_set_type(lsnode_t *node, const char * const type)
 		}
 	}
 
+	/* TODO: check if fil type is set and wether it equals to s_if
+	 *       (for multiple files support)*/
 	if (s_if) {
 		node->mode |= s_if;
 	}
@@ -408,6 +431,13 @@ out:
 	free(tmp_time);
 }
 
+static void node_set_selinux(lsnode_t *node, const char * const ctx)
+{
+	assert(ctx != NULL);
+
+	node->selinux = strdup(ctx);
+}
+
 static void node_set_name(lsnode_t *node, const char * const name)
 {
 	char *sub;
@@ -498,6 +528,7 @@ static int parse_line(char *s, const regex_t *reg, const handler_t h_tbl[])
 		return ERR;
 	}
 
+	/* TODO: search for node at first (for multiple files support) */
 	node = node_alloc();
 	if (!node) {
 		return ERR;
@@ -593,9 +624,14 @@ static int parse(const char *buf, size_t size)
 	char s[1024];
 
 	regcomp(&lsreg, lsreg_str, REG_EXTENDED);
+	regcomp(&lsregx, lsregx_str, REG_EXTENDED);
 
 	while (get_next_line(buf, size, s, sizeof(s))) {
 		err = parse_line(s, &lsreg, lsreg_tbl);
+
+		if (err == ERR) {
+			err = parse_line(s, &lsregx, lsregx_tbl);
+		}
 
 		if (err == ERR && is_dir(s)) {
 			/* remove last ':' */
@@ -606,6 +642,7 @@ static int parse(const char *buf, size_t size)
 	}
 
 	regfree(&lsreg);
+	regfree(&lsregx);
 
 	return OK;
 }
@@ -798,17 +835,31 @@ static int fuse_listxattr(const char *path, char *buf, size_t size)
 static int fuse_getxattr(const char *path, const char *name, char *buf,
 			 size_t size)
 {
-	/* TODO: remove after implementation */
-	(void)path;
-	(void)buf;
+	lsnode_t *node;
+	size_t len;
 
+	/* only selinux xattr is supported */
 	if (strcmp(name, SELINUX_XATTR) != 0) {
-		/* ENOATTR is a synonym for ENODATA */
 		return -ENODATA;
 	}
 
-	/* TODO: not implemented, just return error */
-	return -ENODATA;
+	node = node_from_path(path);
+	if (!node) {
+		return -ENOENT;
+	}
+
+	if (!node->selinux) {
+		return -ENODATA;
+	}
+
+	len = strlen(node->selinux);
+	if (len >= size) {
+		return -ERANGE;
+	}
+
+	strcpy(buf, node->selinux);
+
+	return len + 1;
 }
 
 static void usage(const char *name)
