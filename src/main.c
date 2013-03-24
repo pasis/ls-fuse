@@ -799,6 +799,8 @@ static int fuse_open(const char *path, struct fuse_file_info *fi)
 		return -EACCES;
 	}
 
+	fi->direct_io = 1;
+
 	/* TODO: create and cache data if node->data is NULL */
 
 	return 0;
