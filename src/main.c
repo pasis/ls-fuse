@@ -48,6 +48,22 @@
 
 /* maximum number of regex matches */
 #define MATCH_NUM 10
+/* parts of regexp */
+#define R_SPACE "[ \t]+"
+#define R_SPACE_OPT "[ \t]*"
+#define R_NUM "[0-9]+"
+#define R_NUM_OPT "[0-9]*"
+#define R_TYPE "([-bcdlps])"
+#define R_MODE "([-rwxsS]{9,9})"
+#define R_XMODE "[t@+.]?"
+#define R_USR "([0-9A-Za-z_-]+)"
+#define R_GRP "([0-9A-Za-z_-]+)"
+#define R_SIZ "([0-9]+|[0-9]+,[ \t]+[0-9]+)"
+#define R_MONTH "([^ \t]+)"
+#define R_DATE "([1-3]?[0-9][ \t]+[0-9]{4,4}|[1-3]?[0-9][ \t]+[0-2]?[0-9]:[0-5][0-9])"
+#define R_SELINUX "([0-9a-zA-Z:_.-]+)"
+#define R_NAME "(.+)"
+#define R_BS R_SPACE_OPT R_NUM_OPT R_SPACE_OPT
 
 #define SELINUX_XATTR "security.selinux"
 
@@ -109,10 +125,8 @@ static lsnode_t *cwd = &root;
  */
 static regex_t lsreg;
 static char lsreg_str[] =
-	"^[ \t]*[0-9]*[ \t]*([-bcdlps])([-rwxsS]{9,9})[t@+.]?[ \t]+[0-9]+[ \t]+"
-	"([0-9A-Za-z_-]+)[ \t]+([0-9A-Za-z_-]+)[ \t]+([0-9]+|[0-9]+,[ \t]+[0-9]+)"
-	"[ \t]+([^ \t]+)[ \t]+([1-3]?[0-9][ \t]+[0-9]{4,4}|[1-3]?[0-9][ \t]+"
-	"[0-2]?[0-9]:[0-5][0-9])[ \t]+(.+)$";
+	"^" R_BS R_TYPE R_MODE R_XMODE R_SPACE R_NUM R_SPACE R_USR R_SPACE
+	R_GRP R_SPACE R_SIZ R_SPACE R_MONTH R_SPACE R_DATE R_SPACE R_NAME "$";
 static handler_t lsreg_tbl[MATCH_NUM] = {NULL, node_set_type, node_set_mode,
 	node_set_usr, node_set_grp, node_set_size, node_set_month,
 	node_set_time, node_set_name,};
@@ -127,8 +141,8 @@ static handler_t lsreg_tbl[MATCH_NUM] = {NULL, node_set_type, node_set_mode,
  */
 static regex_t lsregx;
 static char lsregx_str[] =
-	"([-bcdlps])([-rwxsS]{9,9})[t@+.]?[ \t]+([0-9A-Za-z_-]+)[ \t]+"
-	"([0-9A-Za-z_-]+)[ \t]+([0-9a-zA-Z:_.-]+)[ \t]+(.+)$";
+	"^" R_TYPE R_MODE R_XMODE R_SPACE R_USR R_SPACE R_GRP R_SPACE R_SELINUX
+	R_SPACE R_NAME "$";
 static handler_t lsregx_tbl[MATCH_NUM] = {NULL, node_set_type, node_set_mode,
 	node_set_usr, node_set_grp, node_set_selinux, node_set_name,};
 
