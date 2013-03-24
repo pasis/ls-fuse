@@ -481,6 +481,53 @@ static void node_set_name(lsnode_t *node, const char * const name)
 	}
 }
 
+/* node_create_data must be thread safe */
+static void node_create_data(lsnode_t *node)
+{
+	static char data[] = "File: %s\n"
+			     "Size: %s\n"
+			     "Mode: %s\n"
+			     "Owner: %s\n"
+			     "SELinux context: %s\n";
+	static char units[] = {'K', 'M', 'G', 'T', 'P'};
+
+	char *mode;
+	char *owner;
+	char *selinux;
+	char size[8];
+	size_t n;
+	char sfx = 0;
+	int i;
+
+	if (!node->name) {
+		return;
+	}
+
+	/* TODO: implement mode and owner */
+	selinux = owner = mode = "";
+	if (node->selinux != NULL) {
+		selinux = node->selinux;
+	}
+	
+	n = node->size;
+	i = 0;
+	while (n >= 10000 && i < ARRAY_SIZE(units)) {
+		n /= 1024;
+		sfx = units[i];
+		i++;
+	}
+	snprintf(size, sizeof(size), "%d%c", (int)n, sfx);
+
+	n = strlen(node->name) + strlen(size) + strlen(mode) + strlen(owner) +
+	    strlen(selinux) + sizeof(data) - 10;
+
+	node->data = malloc(n);
+	if (node->data != NULL) {
+		snprintf(node->data, n, data, node->name, size, mode, owner,
+			 selinux);
+	}
+}
+
 /* node_from_path must be thread safe */
 static lsnode_t *node_from_path(const char * const path)
 {
@@ -801,7 +848,9 @@ static int fuse_open(const char *path, struct fuse_file_info *fi)
 
 	fi->direct_io = 1;
 
-	/* TODO: create and cache data if node->data is NULL */
+	if (!node->data) {
+		node_create_data(node);
+	}
 
 	return 0;
 }
