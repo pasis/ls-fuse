@@ -232,7 +232,7 @@ static void node_set_type(lsnode_t *node, const char * const type)
 		}
 	}
 
-	/* TODO: check if fil type is set and wether it equals to s_if
+	/* TODO: check if fil type is set and whether it equals to s_if
 	 *       (for multiple files support)*/
 	if (s_if) {
 		node->mode |= s_if;

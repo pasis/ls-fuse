@@ -23,7 +23,7 @@ lf-fuse uses autotools. To build project run the following commands:
 Gentoo users can install ls-fuse package from 'stuff' overlay:
 
 	layman -a stuff
-	echo "=sys-fs/ls-fuse-9999 **" >> /etc/portage/package.keywords"
+	echo "=sys-fs/ls-fuse-9999 **" >> /etc/portage/package.keywords
 	emerge ls-fuse
 
 Or after building from sources just run
