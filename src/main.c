@@ -771,6 +771,8 @@ static int fuse_getattr(const char *path, struct stat *stbuf)
 	}
 	stbuf->st_mode = node->mode;
 	stbuf->st_size = node->size;
+	/* number of 512B blocks allocated */
+	stbuf->st_blocks = (node->size + 511) / 512;
 	stbuf->st_rdev = node->rdev;
 	stbuf->st_uid = node->uid;
 	stbuf->st_gid = node->gid;
