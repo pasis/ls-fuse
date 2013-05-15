@@ -78,8 +78,9 @@ struct lsnode {
 	char *selinux;
 	char *name;
 	char *data;
-	struct lsnode *next;
+	int ndir;             /* number of subdirectories */
 	struct lsnode *entry;
+	struct lsnode *next;
 };
 
 struct hash8 {
@@ -232,10 +233,13 @@ static void node_set_type(lsnode_t *node, const char * const type)
 		}
 	}
 
-	/* TODO: check if fil type is set and whether it equals to s_if
+	/* TODO: check if file type is set and whether it equals to s_if
 	 *       (for multiple files support)*/
 	if (s_if) {
 		node->mode |= s_if;
+		if ((s_if & S_IFDIR) == S_IFDIR) {
+			cwd->ndir++;
+		}
 	}
 }
 
@@ -760,8 +764,12 @@ static int fuse_getattr(const char *path, struct stat *stbuf)
 		return -ENOENT;
 	}
 
+	if ((node->mode & S_IFDIR) == S_IFDIR) {
+		stbuf->st_nlink = node->ndir + 2;
+	} else {
+		stbuf->st_nlink = 1;
+	}
 	stbuf->st_mode = node->mode;
-	stbuf->st_nlink = 1;
 	stbuf->st_size = node->size;
 	stbuf->st_rdev = node->rdev;
 	stbuf->st_uid = node->uid;
