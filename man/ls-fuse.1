@@ -1,0 +1,51 @@
+.TH ls-fuse 1 "May 2013" "ls -lR output mounter"
+
+.SH NAME
+\fBls-fuse\fR \- mount an output of \fBls\fR utility
+
+.SH SYNOPSIS
+\fBls-fuse\fR \fIFILE\fR [\fIOPTIONS\fR] \fIMNTPOINT\fR
+
+.SH DESCRIPTION
+\fBls-fuse\fR is a FUSE driver that mounts output of \fBls\fR utility as read-only filesystem. Use \fBfusermount\fR to umount filesystem.
+.PP
+\fIMNTPOINT\fR is a mounting point. \fIFILE\fR must contain output of \fBls\fR utility that can be run with the following options:
+.IP -l
+(mandatory)
+.IP -a
+(optional)
+.IP -R
+(optional)
+.IP -s
+(optional)
+.IP -Z
+(on systems with SELinux suport, optional)
+
+.SH OPTIONS
+See \fBmount.fuse\fR(8) manual
+
+.SH EXAMPLE
+.nf
+ls -lR --color=never ~/ > ~/home.ls-lR
+mkdir ~/mnt
+ls-fuse ~/home.ls-lR ~/mnt
+.fi
+.PP
+Do some work with filesystem...
+.PP
+.nf
+fusemount -u ~/mnt
+.fi
+
+.SH SEE ALSO
+\fBls\fR(1)
+\fBfusermount\fR(1)
+\fBmount.fuse\fR(8)
+
+.SH BUGS
+getxattr for security.selinux extended attribute doesn't pass to ls-fuse. Instead, genfscon rule is used. (Tested on Fedora 17).
+.PP
+On Linux hosts colorized output of \fBls\fR can be disabled by option --color=never.
+
+.SH AUTHORS
+ls-fuse has been written by Dmitry Podgorny <pasis.ua@gmail.com>.
