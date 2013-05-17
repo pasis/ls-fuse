@@ -1,6 +1,7 @@
 ## DESCRIPTION
 
 ls-fuse mounts output of 'ls -lR', 'ls -lRZ' or 'ls -l' as a pseudo filesystem.
+Output of ftp clients' ls command can be mounted as well.
 
 Supported output of ls with options:
 
