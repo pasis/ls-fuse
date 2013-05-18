@@ -44,6 +44,13 @@ following command will unmount fs:
 
 	fusermount -u mnt
 
+## EXAMPLE 2
+
+ls-fuse supports reading from stdin:
+
+	mkdir ~/mnt
+	ls --color=never -lR | ls-fuse ~/mnt
+
 ## KNOWN ISSUES
 
 * getxattr for security.selinux extended attribute doesn't pass to ls-fuse.
@@ -54,4 +61,3 @@ following command will unmount fs:
 * ls-fuse will be adapted to work under other unix-like systems (macos, freebsd)
 * multiple input files support (entry of the files will be combine to a single
   filesystem)
-* stdin support (this will allow to combine ls-fuse with other unix tools)

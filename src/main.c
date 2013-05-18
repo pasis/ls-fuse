@@ -1012,13 +1012,29 @@ static struct fuse_operations fuse_oper = {
 
 int main(int argc, char **argv)
 {
-	if (argc < 3) {
+	int err;
+
+	if (argc < 2) {
 		usage(argv[0]);
 		return 1;
 	}
-	if (process_file(argv[1]) != OK) {
-		fprintf(stderr, "Unrecognized file format!\n");
+
+	/* XXX possible options ain't supported at the moment for stdin */
+	if (argc == 2) {
+		/* stdin */
+		err = process_fd(0);
+		if (err != OK) {
+			printf("ERROR: can't process stdin\n");
+		}
+	} else {
+		err = process_file(argv[1]);
+		argv++;
+		argc--;
+	}
+
+	if (err != OK) {
 		return 1;
 	}
-	return fuse_main(argc - 1, argv + 1, &fuse_oper);
+
+	return fuse_main(argc, argv, &fuse_oper);
 }
