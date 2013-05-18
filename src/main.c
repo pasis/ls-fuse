@@ -997,7 +997,7 @@ static void usage(const char *name)
 #ifdef PACKAGE_STRING
 	printf(PACKAGE_STRING "\n\n");
 #endif /* PACKAGE_STRING */
-	printf("Usage: %s <FILE> [FUSE_OPTIONS] <MOUNT_POINT>\n", name);
+	printf("Usage: %s [FILE] [FUSE_OPTIONS] MOUNT_POINT\n", name);
 }
 
 static struct fuse_operations fuse_oper = {
@@ -1021,6 +1021,12 @@ int main(int argc, char **argv)
 
 	/* XXX possible options ain't supported at the moment for stdin */
 	if (argc == 2) {
+		if ((strcmp(argv[1], "-h") == 0) ||
+		    (strcmp(argv[1], "--help") == 0)) {
+			usage(argv[0]);
+			return 0;
+		}
+
 		/* stdin */
 		err = process_fd(0);
 		if (err != OK) {
