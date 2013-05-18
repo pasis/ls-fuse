@@ -19,7 +19,6 @@
 
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <sys/mman.h>
 #include <fcntl.h>
 #include <grp.h>
 #include <pwd.h>
@@ -45,6 +44,9 @@
 #endif /* TRUE */
 
 #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
+
+#define MAX_READ_BUFSIZ (1024 * 1024)
+#define STR_BUFSIZ 4096
 
 /* maximum number of regex matches */
 #define MATCH_NUM 10
@@ -147,33 +149,9 @@ static char lsregx_str[] =
 static handler_t lsregx_tbl[MATCH_NUM] = {NULL, node_set_type, node_set_mode,
 	node_set_usr, node_set_grp, node_set_selinux, node_set_name,};
 
-/*
-static int process_file(const char *file)
-{
-	FILE *f;
-	char buf[4096];
-
-	f = fopen(file, "r");
-	if (!f) {
-		perror("fopen");
-		return ERR;
-	}
-
-	while (1) {
-		if (fgets(buf, sizeof(buf), f) == NULL) {
-			break;
-		}
-		printf("%s\n", buf);
-		parse(buf);
-	}
-
-	if (!feof(f)) {
-		printf("error while reading file\n");
-	}
-
-	return OK;
-}
-*/
+char *str_ptr;
+size_t str_len;
+int str_idx;
 
 static lsnode_t *node_alloc(void)
 {
@@ -576,7 +554,7 @@ static lsnode_t *node_from_path(const char * const path)
 	return parent;
 }
 
-static int parse_line(char *s, const regex_t *reg, const handler_t h_tbl[])
+static int parse_line(const char *s, const regex_t *reg, const handler_t h_tbl[])
 {
 	regmatch_t match[MATCH_NUM];
 	int i;
@@ -656,101 +634,175 @@ static int chcwd(const char * const path)
 	return OK;
 }
 
-static char *get_next_line(const char *buf, size_t size, char *s, size_t len)
-{
-	static size_t last;
-	size_t i;
-	size_t tmp_len;
-	const char *tmp_ptr;
-
-	i = last;
-
-	while (i < size) {
-		if (buf[i] == '\n' || buf[i] == '\r' || i == size - 1) {
-			tmp_len = i - last;
-			tmp_ptr = &buf[last];
-			last = i + 1;
-			if (tmp_len > 0 && tmp_len < len) {
-				strncpy(s, tmp_ptr, tmp_len);
-				s[tmp_len] = '\0';
-				return s;
-			}
-		}
-		i++;
-	}
-
-	return NULL;
-}
-
-static int parse(const char *buf, size_t size)
+static int parse(char *line)
 {
 	size_t len;
 	int err;
-	char s[1024];
 
-	regcomp(&lsreg, lsreg_str, REG_EXTENDED);
-	regcomp(&lsregx, lsregx_str, REG_EXTENDED);
-
-	while (get_next_line(buf, size, s, sizeof(s))) {
-		err = parse_line(s, &lsreg, lsreg_tbl);
-
-		if (err == ERR) {
-			err = parse_line(s, &lsregx, lsregx_tbl);
-		}
-
-		if (err == ERR && is_dir(s)) {
-			/* remove last ':' */
-			len = strlen(s);
-			s[len - 1] = '\0';
-			chcwd(s);
-		}
+	err = parse_line(line, &lsreg, lsreg_tbl);
+	if (err != OK) {
+		err = parse_line(line, &lsregx, lsregx_tbl);
 	}
 
-	regfree(&lsreg);
-	regfree(&lsregx);
+	if (err != OK && is_dir(line)) {
+		/* remove last ':' */
+		len = strlen(line);
+		line[len - 1] = '\0';
+		chcwd(line);
+	}
 
 	return OK;
 }
 
+static int buf_to_str(const char *buf, int start, int end)
+{
+	size_t len;
+	void *tmp_ptr;
+
+	assert(start <= end);
+	len = end - start;
+	if (str_len - str_idx <= len) {
+		tmp_ptr = realloc(str_ptr, str_len + len + 1);
+		if (!tmp_ptr) {
+			return ERR;
+		}
+		str_ptr = (char *)tmp_ptr;
+		str_len += len + 1;
+	}
+
+	memcpy(str_ptr + str_idx, buf + start, len);
+	str_idx += len;
+
+	return OK;
+}
+
+static int process_buf(const char *buf, size_t size)
+{
+	int i;
+	static int st;
+	char c;
+	int last = 0;
+	int err;
+
+	assert(size != 0);
+
+	/* FSM */
+	for (i = 0; i < size; i++) {
+		c = buf[i];
+		switch (st) {
+		case 0:
+			if (c == 10 || c == 13) {
+				assert(str_idx < str_len);
+				st = 1;
+				err = buf_to_str(buf, last, i);
+				if (err != OK) {
+					return err;
+				}
+				str_ptr[str_idx] = '\0';
+				err = parse(str_ptr);
+				if (err != OK) {
+					/* only warning */
+				}
+				str_idx = 0;
+			}
+			break;
+		case 1:
+			if (c != 10 && c != 13) {
+				last = i;
+				st = 0;
+			}
+			break;
+		default:
+			/* this shouldn't happen */
+			assert(0);
+		}
+	}
+
+	if (st == 0) {
+		err = buf_to_str(buf, last, size);
+		if (err != OK) {
+			return err;
+		}
+	}
+
+	return OK;
+}
+
+static int process_fd(int fd)
+{
+	ssize_t size;
+	char buf[MAX_READ_BUFSIZ];
+	int err;
+	int result = ERR;
+
+	str_ptr = (char *)malloc(STR_BUFSIZ);
+	if (!str_ptr) {
+		return ERR;
+	}
+	str_len = STR_BUFSIZ;
+
+	err = regcomp(&lsreg, lsreg_str, REG_EXTENDED);
+	if (err < 0) {
+		goto out;
+	}
+	err = regcomp(&lsregx, lsregx_str, REG_EXTENDED);
+	if (err < 0) {
+		goto out_reg;
+	}
+
+	while (1) {
+		size = read(fd, buf, sizeof(buf));
+		if (size < 0) {
+			perror("read");
+			break;
+		}
+
+		if (size == 0) {
+			/* EOF */
+			result = OK;
+			break;
+		}
+
+		err = process_buf(buf, (size_t)size);
+		if (err != OK) {
+			break;
+		}
+	}
+
+	regfree(&lsregx);
+out_reg:
+	regfree(&lsreg);
+out:
+	free(str_ptr);
+
+	return result;
+}
+
 static int process_file(const char *file)
 {
-	struct stat sb;
 	int fd;
 	int result = ERR;
-	char *map;
 
 	if (access(file, R_OK) == -1) {
 		perror("access");
 		return ERR;
 	}
-	fd = open(file, O_RDONLY);
-	if (fd == -1) {
+
+	fd = open(file, O_RDONLY | O_CLOEXEC);
+	if (fd < 0) {
 		perror("open");
 		return ERR;
 	}
 
-	if (fstat(fd, &sb) == -1) {
-		perror("fstat");
-		goto out;
+	result = process_fd(fd);
+	close(fd);
+
+	if (result != OK) {
+		printf("ERROR: can't process file %s\n", file);
 	}
 
-	map = (char *)mmap(NULL, sb.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
-	if (mmap == MAP_FAILED) {
-		perror("mmap");
-		goto out;
-	}
-
-	result = parse(map, sb.st_size);
-
-	if (munmap(map, sb.st_size) == -1) {
-		perror("munmap");
-	}
-
-out:
-	if (close(fd) == -1) {
-		perror("close");
-	}
 	return result;
+
 }
 
 static int fuse_getattr(const char *path, struct stat *stbuf)
