@@ -1,4 +1,4 @@
-AC_INIT([ls-fuse], [dev], [pasis.ua@gmail.com])
+AC_INIT([ls-fuse], [0.1], [pasis.ua@gmail.com])
 AM_INIT_AUTOMAKE([foreign])
 
 AC_CONFIG_FILES([Makefile])
