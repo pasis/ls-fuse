@@ -33,6 +33,8 @@
 #include <string.h>
 #include <time.h>
 
+#include "months.h"
+
 #define ERR 1
 #define OK 0
 
@@ -90,14 +92,8 @@ struct hash8 {
 	int val;
 };
 
-struct hash_str {
-	char *key;
-	int val;
-};
-
 typedef struct lsnode lsnode_t;
 typedef struct hash8 hash8_t;
-typedef struct hash_str hash_str_t;
 typedef void (*handler_t)(lsnode_t *, const char *);
 
 static void node_set_type(lsnode_t *, const char *);
@@ -342,25 +338,11 @@ static void node_set_size(lsnode_t *node, const char * const size)
 
 static void node_set_month(lsnode_t *node, const char * const month)
 {
-	static hash_str_t month_tbl[] = {
-		{"Jan", 0},
-		{"Feb", 1},
-		{"Mar", 2},
-		{"Apr", 3},
-		{"May", 4},
-		{"Jun", 5},
-		{"Jul", 6},
-		{"Aug", 7},
-		{"Sep", 8},
-		{"Oct", 9},
-		{"Nov", 10},
-		{"Dec", 11},
-	};
-
 	int i;
 
 	assert(month != NULL);
 
+	/* see months.h for month_tbl */
 	for (i = 0; i < ARRAY_SIZE(month_tbl); i++) {
 		if (strcmp(month, month_tbl[i].key) == 0) {
 			node->month = month_tbl[i].val;
