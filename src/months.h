@@ -1,13 +1,10 @@
 #ifndef LS_FUSE_MONTHS_H
 #define LS_FUSE_MONTHS_H
 
-struct month_hash {
+static struct {
 	char *key;
 	int val;
-};
-typedef struct month_hash month_hash_t;
-
-static month_hash_t month_tbl[] = {
+} month_tbl[] = {
 	/* english */
 	{"Jan", 0},
 	{"Feb", 1},
