@@ -3,21 +3,47 @@
 ls-fuse mounts output of 'ls -lR', 'ls -lRZ' or 'ls -l' as a pseudo filesystem.
 Output of ftp clients' ls command can be mounted as well.
 
+Purpose of ls-fuse project is similar to [lsfs project][1] or lslR plugin for
+midnight commander. But the main goal was implementation of tool with SELinux
+extended attributes support.
+
+lf-fuse features:
+
+* Native mounting tool: standard unix tools such as find(1) can be used
+* Easy to use: no additional scripts or stages of preparation
+* STDIN support: allows to combine with other unix tools (see EXAMPLE 2)
+* Multiple input files support: allows to merge several ls-lR files into single
+  directory (not implemented yet)
+* SELinux extended attributes support (broken at the moment, see KNOWN ISSUES)
+
 Supported output of ls with options:
 
-* -a (optional)
 * -l (mandatory)
+* -a (optional)
 * -R (optional)
 * -s (optional)
 * -Z (on systems with SELinux suport, optional)
 
-## BUILDING
+[1]: http://lsfs.sourceforge.net
 
-lf-fuse uses autotools. To build project run the following commands:
+## BUILDING FROM SOURCES
+
+Obtain the latest sources from git repo:
+
+	git clone git://github.com/pasis/ls-fuse.git ls-fuse
+
+Also you can get the latest stable tarball at [sourceforge page][2].
+
+If you got sources from git repo you need to run bootstrap.sh script at first.
+It generates configure script. For stable tarballs you already have the
+configure script and don't have to generate it. To build ls-fuse run the
+following commands:
 
 	./bootstrap.sh
 	./configure
 	make
+
+[2]: https://sourceforge.net/projects/lsfuse
 
 ## INSTALLING
 
@@ -27,7 +53,8 @@ Gentoo users can install ls-fuse package from 'stuff' overlay:
 	echo "=sys-fs/ls-fuse-9999 **" >> /etc/portage/package.keywords
 	emerge ls-fuse
 
-Or after building from sources just run
+For other Linux distributions or operating systems just run as root (after
+building from sources of course):
 
 	make install
 
@@ -51,13 +78,12 @@ ls-fuse supports reading from stdin:
 	mkdir ~/mnt
 	ls --color=never -lR | ls-fuse ~/mnt
 
+or
+
+	bzip2 -d -c ls-lR.bz2 | ls-fuse ~/mnt
+
+
 ## KNOWN ISSUES
 
 * getxattr for security.selinux extended attribute doesn't pass to ls-fuse.
   Instead, genfscon rule is used. (Tested on Fedora 17).
-
-## For future
-
-* ls-fuse will be adapted to work under other unix-like systems (macos, freebsd)
-* multiple input files support (entry of the files will be combine to a single
-  filesystem)
