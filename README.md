@@ -50,13 +50,15 @@ following commands:
 Gentoo users can install ls-fuse package from 'stuff' overlay:
 
 	layman -a stuff
-	echo "=sys-fs/ls-fuse-9999 **" >> /etc/portage/package.keywords
 	emerge ls-fuse
 
 For other Linux distributions or operating systems just run as root (after
 building from sources of course):
 
 	make install
+
+Note, you don't have to install ls-fuse to use it. You can you executable file
+ls-fuse as standalone program.
 
 ## EXAMPLE
 
