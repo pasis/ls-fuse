@@ -34,6 +34,7 @@
 #include <time.h>
 
 #include "months.h"
+#include "hash.h"
 
 #define ERR 1
 #define OK 0
@@ -87,13 +88,7 @@ struct lsnode {
 	struct lsnode *next;
 };
 
-struct hash8 {
-	char key;
-	int val;
-};
-
 typedef struct lsnode lsnode_t;
-typedef struct hash8 hash8_t;
 typedef void (*handler_t)(lsnode_t *, const char *);
 
 static void node_set_type(lsnode_t *, const char *);
@@ -111,6 +106,9 @@ static lsnode_t root = {
 	.name = "/",
 };
 static lsnode_t *cwd = &root;
+
+static hash_tbl_t hash_usr;
+static hash_tbl_t hash_grp;
 
 /* lsreg - regex for ls -l and ls -lR */
 /* 1 - file type
@@ -177,7 +175,10 @@ static void node_free(lsnode_t *node)
 
 static void node_set_type(lsnode_t *node, const char * const type)
 {
-	static hash8_t type_map[] = {
+	static struct {
+		char key;
+		int value;
+	} type_map[] = {
 		{'-', S_IFREG},
 		{'b', S_IFBLK},
 		{'c', S_IFCHR},
@@ -202,7 +203,7 @@ static void node_set_type(lsnode_t *node, const char * const type)
 	c = type[0];
 	for (i = 0; i < ARRAY_SIZE(type_map); i++) {
 		if (type_map[i].key == c) {
-			s_if = type_map[i].val;
+			s_if = type_map[i].value;
 			break;
 		}
 	}
@@ -275,16 +276,22 @@ static void node_set_usr(lsnode_t *node, const char * const owner)
 
 	assert(owner != NULL);
 
-	pwd = getpwnam(owner);
-	if (pwd) {
-		node->uid = pwd->pw_uid;
+	uid = hash_get(hash_usr, owner);
+	if (uid != -1) {
+		node->uid = (uid_t)uid;
 	} else {
-		/* if owner is numeric */
-		uid = strtol(owner, &endptr, 10);
-		assert(endptr != NULL);
-		if (*endptr == '\0') {
-			node->uid = uid;
+		pwd = getpwnam(owner);
+		if (pwd) {
+			node->uid = pwd->pw_uid;
+		} else {
+			/* if owner is numeric */
+			uid = strtol(owner, &endptr, 10);
+			assert(endptr != NULL);
+			if (*endptr == '\0') {
+				node->uid = (uid_t)uid;
+			}
 		}
+		hash_add(hash_usr, owner, (long)node->uid);
 	}
 }
 
@@ -296,16 +303,22 @@ static void node_set_grp(lsnode_t *node, const char * const group)
 
 	assert(group != NULL);
 
-	grp = getgrnam(group);
-	if (grp) {
-		node->gid = grp->gr_gid;
+	gid = hash_get(hash_grp, group);
+	if (gid != -1) {
+		node->gid = (gid_t)gid;
 	} else {
-		/* if group is numeric */
-		gid = strtol(group, &endptr, 10);
-		assert(endptr != NULL);
-		if (*endptr == '\0') {
-			node->gid = gid;
+		grp = getgrnam(group);
+		if (grp) {
+			node->gid = grp->gr_gid;
+		} else {
+			/* if group is numeric */
+			gid = strtol(group, &endptr, 10);
+			assert(endptr != NULL);
+			if (*endptr == '\0') {
+				node->gid = (gid_t)gid;
+			}
 		}
+		hash_add(hash_grp, group, (long)node->gid);
 	}
 }
 
