@@ -22,6 +22,7 @@
 
 #include <assert.h>
 #include <limits.h>
+#include <stdlib.h>
 
 #if defined(_POSIX_LOGIN_NAME_MAX) && _POSIX_LOGIN_NAME_MAX > 32
 #define MAX_KEY_LEN _POSIX_LOGIN_NAME_MAX
@@ -56,12 +57,10 @@ static int hash_func(const char *s)
 	return h;
 }
 
-/* XXX: debug */
-#include <stdio.h>
-
 static inline void hash_add(hash_tbl_t tbl, const char *key, long value)
 {
 	int i;
+	hash_t *h;
 
 	i = hash_func(key);
 	if (*tbl[i].key == 0) {
@@ -70,22 +69,36 @@ static inline void hash_add(hash_tbl_t tbl, const char *key, long value)
 		tbl[i].value = value;
 
 	} else {
-		/* not implemented yet */
-		printf("hash_add: not implemented\n");
+		h = &tbl[i];
+		while (h->next) {
+			h = h->next;
+		}
+		h->next = (hash_t *)malloc(sizeof(hash_t));
+		h = h->next;
+		memset(h, 0, sizeof(hash_t));
+		/* h->key will be null-terminated as h->key[MAX_KEY_LEN] is
+		 * set to 0 by memset */
+		strncpy(h->key, key, MAX_KEY_LEN - 1);
+		h->value = value;
 	}
 }
 
 static inline long hash_get(const hash_tbl_t tbl, const char *key)
 {
 	int i;
+	const hash_t *h;
 
 	i = hash_func(key);
 	if (*tbl[i].key == 0) {
 		return -1;
 	}
 
-	if (strncmp(tbl[i].key, key, MAX_KEY_LEN) == 0) {
-		return tbl[i].value;
+	h = &tbl[i];
+	while (h) {
+		if (strncmp(h->key, key, MAX_KEY_LEN) == 0) {
+			return h->value;
+		}
+		h = h->next;
 	}
 
 	return -1;
