@@ -512,7 +512,7 @@ static lsnode_t *node_from_path(const char * const path)
 	lsnode_t *node;
 	char *tmp = strdup(path);
 	char *tok;
-	char *saveptr;
+	char *saveptr = NULL;
 	int found;
 
 	parent = &root;
