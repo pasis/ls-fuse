@@ -59,7 +59,7 @@
 #define R_NUM "[0-9]+"
 #define R_NUM_OPT "[0-9]*"
 #define R_TYPE "([-bcdlps])"
-#define R_MODE "([-rwxsS]{9,9})"
+#define R_MODE "([-rwxsStT]{9,9})"
 #define R_XMODE "[t@+.]?"
 #define R_USR "([0-9A-Za-z_-]+)"
 #define R_GRP "([0-9A-Za-z_-]+)"
@@ -243,6 +243,8 @@ static void node_set_mode(lsnode_t *node, const char * const mode)
 	} else if (mode[2] == 's') {
 		st_mode |= S_IXUSR;
 		st_mode |= S_ISUID;
+	} else if (mode[2] == 'S') {
+		st_mode |= S_ISUID;
 	}
 
 	if (mode[3] == 'r') {
@@ -256,6 +258,8 @@ static void node_set_mode(lsnode_t *node, const char * const mode)
 	} else if (mode[5] == 's') {
 		st_mode |= S_IXGRP;
 		st_mode |= S_ISGID;
+	} else if (mode[5] == 'S') {
+		st_mode |= S_ISGID;
 	}
 
 	if (mode[6] == 'r') {
@@ -266,6 +270,11 @@ static void node_set_mode(lsnode_t *node, const char * const mode)
 	}
 	if (mode[8] == 'x') {
 		st_mode |= S_IXOTH;
+	} else if (mode[8] == 't') {
+		st_mode |= S_IXOTH;
+		st_mode |= S_ISVTX;
+	} else if (mode[8] == 'T') {
+		st_mode |= S_ISVTX;
 	}
 
 	node->mode |= st_mode;
