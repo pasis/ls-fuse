@@ -4,8 +4,8 @@ ls-fuse mounts output of 'ls -lR', 'ls -lRZ' or 'ls -l' as a pseudo filesystem.
 Output of ftp clients' ls command can be mounted as well.
 
 Purpose of ls-fuse project is similar to [lsfs project][1] or lslR plugin for
-midnight commander. But the main goal was implementation of tool with SELinux
-extended attributes support.
+midnight commander. But the main goal was implementation of a fast native tool
+with SELinux extended attributes support.
 
 lf-fuse features:
 
@@ -13,7 +13,7 @@ lf-fuse features:
 * Easy to use: no additional scripts or stages of preparation
 * STDIN support: allows to combine with other unix tools (see EXAMPLE 2)
 * Multiple input files support: allows to merge several ls-lR files into single
-  directory (not implemented yet)
+  directory (see EXAMPLE 3)
 * SELinux extended attributes support (broken at the moment, see KNOWN ISSUES)
 
 Supported output of ls with options:
@@ -73,9 +73,9 @@ following command will unmount fs:
 
 	fusermount -u mnt
 
-## EXAMPLE 2
+## EXAMPLE 2 (STDIN SUPPORT)
 
-ls-fuse supports reading from stdin:
+ls-fuse supports reading from standard input stream:
 
 	mkdir ~/mnt
 	ls --color=never -lR | ls-fuse ~/mnt
@@ -84,8 +84,22 @@ or
 
 	bzip2 -d -c ls-lR.bz2 | ls-fuse ~/mnt
 
+## EXAMPLE 3 (MULTIPlE FILES SUPPORT)
+
+ls-fuse allows to merge a set of ls-lR files to a single directory:
+
+	ls-fuse 1.ls-lR 2.ls-lR 3.ls-lR ~/mnt
+
+Any FUSE options must be placed after the set of files, for example:
+
+	ls-fuse 1.ls-lR 2.ls-lR 3.ls-lR -o ro ~/mnt
+
+Option '-o ro' says FUSE to mount filesystem as read-only.
 
 ## KNOWN ISSUES
 
 * getxattr for security.selinux extended attribute doesn't pass to ls-fuse.
   Instead, genfscon rule is used. (Tested on Fedora 17).
+* Collisions while mounting several ls-lR files ain't handled for now. If this
+  happens you will see several files with the same name. But it's not a
+  disaster :)

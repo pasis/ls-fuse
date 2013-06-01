@@ -121,10 +121,10 @@ static hash_tbl_t hash_grp;
  * 8 - file name
  */
 static regex_t lsreg;
-static char lsreg_str[] =
+static const char lsreg_str[] =
 	"^" R_BS R_TYPE R_MODE R_XMODE R_SPACE R_NUM R_SPACE R_USR R_SPACE
 	R_GRP R_SPACE R_SIZ R_SPACE R_MONTH R_SPACE R_DATE R_SPACE R_NAME "$";
-static handler_t lsreg_tbl[MATCH_NUM] = {NULL, node_set_type, node_set_mode,
+static const handler_t lsreg_tbl[MATCH_NUM] = {NULL, node_set_type, node_set_mode,
 	node_set_usr, node_set_grp, node_set_size, node_set_month,
 	node_set_time, node_set_name,};
 
@@ -137,12 +137,15 @@ static handler_t lsreg_tbl[MATCH_NUM] = {NULL, node_set_type, node_set_mode,
  * 6 - file name
  */
 static regex_t lsregx;
-static char lsregx_str[] =
+static const char lsregx_str[] =
 	"^" R_TYPE R_MODE R_XMODE R_SPACE R_USR R_SPACE R_GRP R_SPACE R_SELINUX
 	R_SPACE R_NAME "$";
-static handler_t lsregx_tbl[MATCH_NUM] = {NULL, node_set_type, node_set_mode,
+static const handler_t lsregx_tbl[MATCH_NUM] = {NULL, node_set_type, node_set_mode,
 	node_set_usr, node_set_grp, node_set_selinux, node_set_name,};
 
+/* FSM state */
+static int fsm_st;
+/* tmp buffer for processing files line by line */
 char *str_ptr;
 size_t str_len;
 int str_idx;
@@ -175,7 +178,7 @@ static void node_free(lsnode_t *node)
 
 static void node_set_type(lsnode_t *node, const char * const type)
 {
-	static struct {
+	static const struct {
 		char key;
 		int value;
 	} type_map[] = {
@@ -461,12 +464,12 @@ static void node_set_name(lsnode_t *node, const char * const name)
 /* node_create_data must be thread safe */
 static void node_create_data(lsnode_t *node)
 {
-	static char data[] = "File: %s\n"
-			     "Size: %s\n"
-			     "Mode: %s\n"
-			     "Owner: %s\n"
-			     "SELinux context: %s\n";
-	static char units[] = {'K', 'M', 'G', 'T', 'P'};
+	static const char data[] = "File: %s\n"
+				   "Size: %s\n"
+				   "Mode: %s\n"
+				   "Owner: %s\n"
+				   "SELinux context: %s\n";
+	static const char units[] = {'K', 'M', 'G', 'T', 'P'};
 
 	char *mode;
 	char *owner;
@@ -674,7 +677,6 @@ static int buf_to_str(const char *buf, int start, int end)
 static int process_buf(const char *buf, size_t size)
 {
 	int i;
-	static int st;
 	char c;
 	int last = 0;
 	int err;
@@ -684,11 +686,11 @@ static int process_buf(const char *buf, size_t size)
 	/* FSM */
 	for (i = 0; i < size; i++) {
 		c = buf[i];
-		switch (st) {
+		switch (fsm_st) {
 		case 0:
 			if (c == 10 || c == 13) {
 				assert(str_idx < str_len);
-				st = 1;
+				fsm_st = 1;
 				err = buf_to_str(buf, last, i);
 				if (err != OK) {
 					return err;
@@ -704,7 +706,7 @@ static int process_buf(const char *buf, size_t size)
 		case 1:
 			if (c != 10 && c != 13) {
 				last = i;
-				st = 0;
+				fsm_st = 0;
 			}
 			break;
 		default:
@@ -713,7 +715,7 @@ static int process_buf(const char *buf, size_t size)
 		}
 	}
 
-	if (st == 0) {
+	if (fsm_st == 0) {
 		err = buf_to_str(buf, last, size);
 		if (err != OK) {
 			return err;
@@ -775,8 +777,8 @@ out:
 
 static int process_file(const char *file)
 {
+	int err;
 	int fd;
-	int result = ERR;
 
 	if (access(file, R_OK) == -1) {
 		perror("access");
@@ -789,15 +791,10 @@ static int process_file(const char *file)
 		return ERR;
 	}
 
-	result = process_fd(fd);
+	err = process_fd(fd);
 	close(fd);
 
-	if (result != OK) {
-		printf("ERROR: can't process file %s\n", file);
-	}
-
-	return result;
-
+	return err;
 }
 
 static int fuse_getattr(const char *path, struct stat *stbuf)
@@ -987,12 +984,19 @@ static int fuse_getxattr(const char *path, const char *name, char *buf,
 	return len + 1;
 }
 
+static void clear_state(void)
+{
+	cwd = &root;
+	fsm_st = 0;
+	str_idx = 0;
+}
+
 static void usage(const char *name)
 {
 #ifdef PACKAGE_STRING
 	printf(PACKAGE_STRING "\n\n");
 #endif /* PACKAGE_STRING */
-	printf("Usage: %s [FILE] [FUSE_OPTIONS] MOUNT_POINT\n", name);
+	printf("Usage: %s [FILES ...] [FUSE_OPTIONS] MOUNT_POINT\n", name);
 }
 
 static struct fuse_operations fuse_oper = {
@@ -1008,33 +1012,47 @@ static struct fuse_operations fuse_oper = {
 int main(int argc, char **argv)
 {
 	int err;
+	int count;
 
 	if (argc < 2) {
 		usage(argv[0]);
 		return 1;
 	}
 
-	/* XXX possible options ain't supported at the moment for stdin */
-	if (argc == 2) {
-		if ((strcmp(argv[1], "-h") == 0) ||
-		    (strcmp(argv[1], "--help") == 0)) {
-			usage(argv[0]);
-			return 0;
-		}
+	/* if --help option passed */
+	if ( argc == 2 && ((strcmp(argv[1], "-h") == 0) ||
+			   (strcmp(argv[1], "--help") == 0)) ) {
+		usage(argv[0]);
+		return 0;
+	}
 
+	/* TODO: move str_ptr allocation and regex initialization here */
+
+	count = 0;
+	while (argc > 2 && argv[1][0] != '-') {
+		/* if process_file() fails count still will be increased */
+		++count;
+		clear_state();
+		err = process_file(argv[1]);
+		if (err != OK) {
+			printf("ERROR: can't process file %s", argv[1]);
+			break;
+		}
+		++argv;
+		--argc;
+	}
+
+	if (count == 0) {
 		/* stdin */
 		err = process_fd(0);
 		if (err != OK) {
 			printf("ERROR: can't process stdin\n");
 		}
-	} else {
-		err = process_file(argv[1]);
-		argv++;
-		argc--;
 	}
 
 	if (err != OK) {
-		return 1;
+		/* allocated memory will be freed on exit */
+		return 2;
 	}
 
 	return fuse_main(argc, argv, &fuse_oper);
