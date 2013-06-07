@@ -741,21 +741,6 @@ static int process_fd(int fd)
 	int err;
 	int result = ERR;
 
-	str_ptr = (char *)malloc(STR_BUFSIZ);
-	if (!str_ptr) {
-		return ERR;
-	}
-	str_len = STR_BUFSIZ;
-
-	err = regcomp(&lsreg, lsreg_str, REG_EXTENDED);
-	if (err < 0) {
-		goto out;
-	}
-	err = regcomp(&lsregx, lsregx_str, REG_EXTENDED);
-	if (err < 0) {
-		goto out_reg;
-	}
-
 	while (1) {
 		size = read(fd, buf, sizeof(buf));
 		if (size < 0) {
@@ -774,12 +759,6 @@ static int process_fd(int fd)
 			break;
 		}
 	}
-
-	regfree(&lsregx);
-out_reg:
-	regfree(&lsreg);
-out:
-	free(str_ptr);
 
 	return result;
 }
@@ -1035,7 +1014,27 @@ int main(int argc, char **argv)
 		return 0;
 	}
 
-	/* TODO: move str_ptr allocation and regex initialization here */
+	/* allocate resources */
+	str_ptr = (char *)malloc(STR_BUFSIZ);
+	if (!str_ptr) {
+		printf("ERROR: can't allocate memory\n");
+		return 1;
+	}
+	str_len = STR_BUFSIZ;
+
+	err = regcomp(&lsreg, lsreg_str, REG_EXTENDED);
+	if (err < 0) {
+		printf("ERROR: can't process regular expression\n");
+		free(str_ptr);
+		return 1;
+	}
+	err = regcomp(&lsregx, lsregx_str, REG_EXTENDED);
+	if (err < 0) {
+		printf("ERROR: can't process regular expression\n");
+		free(str_ptr);
+		regfree(&lsreg);;
+		return 1;
+	}
 
 	count = 0;
 	while (argc > 2 && argv[1][0] != '-') {
@@ -1044,7 +1043,7 @@ int main(int argc, char **argv)
 		clear_state();
 		err = process_file(argv[1]);
 		if (err != OK) {
-			printf("ERROR: can't process file %s", argv[1]);
+			printf("ERROR: can't process file %s\n", argv[1]);
 			break;
 		}
 		++argv;
@@ -1058,6 +1057,10 @@ int main(int argc, char **argv)
 			printf("ERROR: can't process stdin\n");
 		}
 	}
+
+	regfree(&lsregx);
+	regfree(&lsreg);
+	free(str_ptr);
 
 	if (err != OK) {
 		/* allocated memory will be freed on exit */
