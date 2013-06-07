@@ -1,4 +1,4 @@
-AC_INIT([ls-fuse], [0.2dev], [pasis.ua@gmail.com])
+AC_INIT([ls-fuse], [0.2], [pasis.ua@gmail.com])
 AM_INIT_AUTOMAKE([foreign])
 
 AC_CONFIG_FILES([Makefile])
@@ -15,6 +15,8 @@ CFLAGS="$CFLAGS $fuse_CFLAGS"
 
 if test "x$enable_debug" = xyes; then
 	CFLAGS="$CFLAGS -DDEBUG"
+else
+	CFLAGS="$CFLAGS -DNDEBUG"
 fi
 
 AC_OUTPUT

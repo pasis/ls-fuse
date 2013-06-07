@@ -1,0 +1,11 @@
+
+		Changes for ls-fuse
+
+Changes in 0.2 (08 Jun 2013)
+- Multiple files support
+- Added russian months (new languages may be added in months.h)
+- Added support of sticky bit
+- Faster parsing
+
+Changes in 0.1 (18 May 2013)
+- First stable release
