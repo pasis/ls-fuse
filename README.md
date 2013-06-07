@@ -16,13 +16,16 @@ lf-fuse features:
   directory (see EXAMPLE 3)
 * SELinux extended attributes support (broken at the moment, see KNOWN ISSUES)
 
-Supported output of ls with options:
+ls-fuse supports output of ls that was run with the next options:
 
 * -l (mandatory)
 * -a (optional)
 * -R (optional)
 * -s (optional)
 * -Z (on systems with SELinux suport, optional)
+
+All regular files on the pseudo filesystem are readable. ls-fuse returns
+some information about file when reading.
 
 [1]: http://lsfs.sourceforge.net
 
@@ -84,7 +87,7 @@ or
 
 	bzip2 -d -c ls-lR.bz2 | ls-fuse ~/mnt
 
-## EXAMPLE 3 (MULTIPlE FILES SUPPORT)
+## EXAMPLE 3 (MULTIPLE FILES SUPPORT)
 
 ls-fuse allows to merge a set of ls-lR files to a single directory:
 
