@@ -60,7 +60,7 @@ building from sources of course):
 
 	make install
 
-Note, you don't have to install ls-fuse to use it. You can you executable file
+Note, you don't have to install ls-fuse to use it. You can use executable file
 ls-fuse as standalone program.
 
 ## EXAMPLE
