@@ -69,6 +69,9 @@
 #define R_SELINUX "([0-9a-zA-Z:_.-]+)"
 #define R_NAME "(.+)"
 #define R_BS R_SPACE_OPT R_NUM_OPT R_SPACE_OPT
+#define R_SIZ_TOOLBOX "([0-9]+|[0-9]+,[ \t]+[0-9]+|[ \t])"
+#define R_DATE_TOOLBOX "([0-9]{4,4}-[0-9]{2,2}-[0-9]{2,2})"
+#define R_TIME_TOOLBOX "([0-2][0-9]:[0-5][0-9])"
 
 #define SELINUX_XATTR "security.selinux"
 
@@ -98,6 +101,8 @@ static void node_set_grp(lsnode_t *, const char *);
 static void node_set_size(lsnode_t *, const char *);
 static void node_set_month(lsnode_t *, const char *);
 static void node_set_time(lsnode_t *, const char *);
+static void node_set_time_toolbox(lsnode_t *node, const char * const time2);
+static void node_set_date_toolbox(lsnode_t *node, const char * const date);
 static void node_set_selinux(lsnode_t *, const char *);
 static void node_set_name(lsnode_t *, const char *);
 
@@ -124,9 +129,28 @@ static regex_t lsreg;
 static const char lsreg_str[] =
 	"^" R_BS R_TYPE R_MODE R_XMODE R_SPACE R_NUM R_SPACE R_USR R_SPACE
 	R_GRP R_SPACE R_SIZ R_SPACE R_MONTH R_SPACE R_DATE R_SPACE R_NAME "$";
-static const handler_t lsreg_tbl[MATCH_NUM] = {NULL, node_set_type, node_set_mode,
-	node_set_usr, node_set_grp, node_set_size, node_set_month,
-	node_set_time, node_set_name,};
+static const handler_t lsreg_tbl[MATCH_NUM] = {NULL, node_set_type,
+	node_set_mode, node_set_usr, node_set_grp, node_set_size,
+	node_set_month, node_set_time, node_set_name,};
+
+/* lsrega - regex for Android's toolbox */
+/* 1 - file type
+ * 2 - file mode (rwx)
+ * 3 - owner
+ * 4 - group
+ * 5 - size or major, minor (empty for directories)
+ * 6 - date
+ * 7 - time
+ * 8 - file name
+ */
+static regex_t lsrega;
+static const char lsrega_str[] =
+	"^" R_BS R_TYPE R_MODE R_XMODE R_SPACE R_USR R_SPACE
+	R_GRP R_SPACE R_SIZ_TOOLBOX R_SPACE R_DATE_TOOLBOX R_SPACE
+	R_TIME_TOOLBOX R_SPACE R_NAME "$";
+static const handler_t lsrega_tbl[MATCH_NUM] = {NULL, node_set_type,
+	node_set_mode, node_set_usr, node_set_grp, node_set_size,
+	node_set_date_toolbox, node_set_time_toolbox, node_set_name,};
 
 /* lsregx - regex for ls -lZ and ls -lRZ */
 /* 1 - file type
@@ -140,8 +164,15 @@ static regex_t lsregx;
 static const char lsregx_str[] =
 	"^" R_TYPE R_MODE R_XMODE R_SPACE R_USR R_SPACE R_GRP R_SPACE R_SELINUX
 	R_SPACE R_NAME "$";
-static const handler_t lsregx_tbl[MATCH_NUM] = {NULL, node_set_type, node_set_mode,
-	node_set_usr, node_set_grp, node_set_selinux, node_set_name,};
+static const handler_t lsregx_tbl[MATCH_NUM] = {NULL, node_set_type,
+	node_set_mode, node_set_usr, node_set_grp, node_set_selinux,
+	node_set_name,};
+
+/* TODO: make table:
+ *  - add new regex with regex_add_new()
+ *  - use this order in parse()
+ *  - use pointers from table to free regexes
+ */
 
 /* FSM state */
 static int fsm_st;
@@ -434,6 +465,58 @@ out:
 	free(tmp_time);
 }
 
+static void node_set_time_toolbox(lsnode_t *node, const char * const time2)
+{
+	char *endptr = NULL;
+	long hour, min;
+
+	assert(time2 != NULL);
+	assert(strlen(time2) == 5);
+
+	hour = strtol(time2, &endptr, 10);
+	if (endptr - time2 != 2 || *endptr != ':') {
+		return;
+	}
+
+	min = strtol(time2 + 3, &endptr, 10);
+	if (*endptr != '\0') {
+		return;
+	}
+
+	node->time += (time_t)(hour * 3600 + min * 60);
+}
+
+static void node_set_date_toolbox(lsnode_t *node, const char * const date)
+{
+	struct tm t;
+	time_t unix_time;
+	char *endptr = NULL;
+
+	assert(date != NULL);
+	assert(strlen(date) == 10);
+
+	memset(&t, 0, sizeof(t));
+
+	t.tm_year = strtol(date, &endptr, 10);
+	if (endptr - date != 4) {
+		return;
+	}
+	t.tm_mon = strtol(date + 5, &endptr, 10);
+	if (endptr - date != 7) {
+		return;
+	}
+	--t.tm_mon;
+	t.tm_mday = strtol(date + 8, &endptr, 10);
+	if (*endptr != '\0') {
+		return;
+	}
+
+	unix_time = mktime(&t);
+	if (unix_time >= 0) {
+		node->time += unix_time;
+	}
+}
+
 static void node_set_selinux(lsnode_t *node, const char * const ctx)
 {
 	assert(ctx != NULL);
@@ -646,7 +729,11 @@ static int parse(char *line)
 	size_t len;
 	int err;
 
+	/* TODO: make table */
 	err = parse_line(line, &lsreg, lsreg_tbl);
+	if (err != OK) {
+		err = parse_line(line, &lsrega, lsrega_tbl);
+	}
 	if (err != OK) {
 		err = parse_line(line, &lsregx, lsregx_tbl);
 	}
@@ -1022,17 +1109,26 @@ int main(int argc, char **argv)
 	}
 	str_len = STR_BUFSIZ;
 
+	/* TODO: make table */
 	err = regcomp(&lsreg, lsreg_str, REG_EXTENDED);
 	if (err < 0) {
 		printf("ERROR: can't process regular expression\n");
 		free(str_ptr);
 		return 1;
 	}
+	err = regcomp(&lsrega, lsrega_str, REG_EXTENDED);
+	if (err < 0) {
+		printf("ERROR: can't process regular expression\n");
+		free(str_ptr);
+		regfree(&lsreg);
+		return 1;
+	}
 	err = regcomp(&lsregx, lsregx_str, REG_EXTENDED);
 	if (err < 0) {
 		printf("ERROR: can't process regular expression\n");
 		free(str_ptr);
-		regfree(&lsreg);;
+		regfree(&lsreg);
+		regfree(&lsrega);
 		return 1;
 	}
 
@@ -1058,7 +1154,9 @@ int main(int argc, char **argv)
 		}
 	}
 
+	/* TODO: make table */
 	regfree(&lsregx);
+	regfree(&lsrega);
 	regfree(&lsreg);
 	free(str_ptr);
 
