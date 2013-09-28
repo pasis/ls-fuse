@@ -101,8 +101,8 @@ static void node_set_grp(lsnode_t *, const char *);
 static void node_set_size(lsnode_t *, const char *);
 static void node_set_month(lsnode_t *, const char *);
 static void node_set_time(lsnode_t *, const char *);
-static void node_set_time_toolbox(lsnode_t *node, const char * const time2);
-static void node_set_date_toolbox(lsnode_t *node, const char * const date);
+static void node_set_time_toolbox(lsnode_t *, const char *);
+static void node_set_date_toolbox(lsnode_t *, const char *);
 static void node_set_selinux(lsnode_t *, const char *);
 static void node_set_name(lsnode_t *, const char *);
 
