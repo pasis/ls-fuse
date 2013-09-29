@@ -222,7 +222,7 @@ static void node_set_type(lsnode_t *node, const char * const type)
 		{'s', S_IFSOCK},
 	};
 
-	int i;
+	size_t i;
 	int s_if;
 	char c;
 
@@ -394,7 +394,7 @@ static void node_set_size(lsnode_t *node, const char * const size)
 
 static void node_set_month(lsnode_t *node, const char * const month)
 {
-	int i;
+	size_t i;
 
 	assert(month != NULL);
 
@@ -569,7 +569,7 @@ static void node_create_data(lsnode_t *node)
 	char size[8];
 	size_t n;
 	char sfx = 0;
-	int i;
+	size_t i;
 
 	if (!node->name) {
 		return;
@@ -772,7 +772,7 @@ static int buf_to_str(const char *buf, int start, int end)
 
 static int process_buf(const char *buf, size_t size)
 {
-	int i;
+	size_t i;
 	char c;
 	int last = 0;
 	int err;
@@ -907,6 +907,9 @@ static int fuse_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 	lsnode_t *node;
 	char *name;
 
+	(void)offset;
+	(void)fi;
+
 	parent = node_from_path(path);
 	if (!parent) {
 		return -ENOENT;
@@ -991,6 +994,8 @@ static int fuse_read(const char *path, char *buf, size_t size, off_t offset,
 	size_t len;
 	char *ptr;
 
+	(void)fi;
+
 	node = node_from_path(path);
 	if (!node) {
 		return -EIO;
@@ -1001,7 +1006,7 @@ static int fuse_read(const char *path, char *buf, size_t size, off_t offset,
 	}
 
 	len = strlen(node->data);
-	if (offset > len) {
+	if (offset > (off_t)len) {
 		return -EFAULT;
 	}
 
