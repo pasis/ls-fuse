@@ -33,8 +33,9 @@
 #include <string.h>
 #include <time.h>
 
-#include "months.h"
 #include "hash.h"
+#include "months.h"
+#include "node.h"
 
 #define ERR 1
 #define OK 0
@@ -74,25 +75,6 @@
 #define R_TIME_TOOLBOX "([0-2][0-9]:[0-5][0-9])"
 
 #define SELINUX_XATTR "security.selinux"
-
-struct lsnode {
-	mode_t mode;
-	uid_t uid;
-	gid_t gid;
-	off_t size;
-	dev_t rdev;
-	int month;
-	time_t time;
-	char *selinux;
-	char *name;
-	char *data;
-	int ndir;             /* number of subdirectories */
-	struct lsnode *entry;
-	struct lsnode *next;
-};
-
-typedef struct lsnode lsnode_t;
-typedef void (*handler_t)(lsnode_t *, const char *);
 
 static void node_set_type(lsnode_t *, const char *);
 static void node_set_mode(lsnode_t *, const char *);
