@@ -227,6 +227,7 @@ static void node_set_type(lsnode_t *node, const char * const type)
 	char c;
 
 	assert(type != NULL);
+	assert((node->mode & S_IFMT) == 0);
 
 	if (strlen(type) != 1) {
 		/* wrong string format */
@@ -308,6 +309,7 @@ static void node_set_mode(lsnode_t *node, const char * const mode)
 		st_mode |= S_ISVTX;
 	}
 
+	node->mode &= S_IFMT;
 	node->mode |= st_mode;
 }
 
