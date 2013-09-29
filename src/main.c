@@ -857,11 +857,6 @@ static int process_file(const char *file)
 	int err;
 	int fd;
 
-	if (access(file, R_OK) == -1) {
-		perror("access");
-		return ERR;
-	}
-
 	fd = open(file, O_RDONLY | O_CLOEXEC);
 	if (fd < 0) {
 		perror("open");
