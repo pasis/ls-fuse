@@ -52,6 +52,10 @@
 #define MAX_READ_BUFSIZ (1024 * 1024)
 #define STR_BUFSIZ 4096
 
+#ifndef STDIN_FILENO
+#define STDIN_FILENO 0
+#endif
+
 /* maximum number of regex matches */
 #define MATCH_NUM 10
 /* parts of regexp */
@@ -111,7 +115,7 @@ static regex_t lsreg;
 static const char lsreg_str[] =
 	"^" R_BS R_TYPE R_MODE R_XMODE R_SPACE R_NUM R_SPACE R_USR R_SPACE
 	R_GRP R_SPACE R_SIZ R_SPACE R_MONTH R_SPACE R_DATE R_SPACE R_NAME "$";
-static const handler_t lsreg_tbl[MATCH_NUM] = {NULL, node_set_type,
+static const handler_t lsreg_cb[MATCH_NUM] = {NULL, node_set_type,
 	node_set_mode, node_set_usr, node_set_grp, node_set_size,
 	node_set_month, node_set_time, node_set_name,};
 
@@ -130,7 +134,7 @@ static const char lsrega_str[] =
 	"^" R_BS R_TYPE R_MODE R_XMODE R_SPACE R_USR R_SPACE
 	R_GRP R_SPACE R_SIZ_TOOLBOX R_SPACE R_DATE_TOOLBOX R_SPACE
 	R_TIME_TOOLBOX R_SPACE R_NAME "$";
-static const handler_t lsrega_tbl[MATCH_NUM] = {NULL, node_set_type,
+static const handler_t lsrega_cb[MATCH_NUM] = {NULL, node_set_type,
 	node_set_mode, node_set_usr, node_set_grp, node_set_size,
 	node_set_date_toolbox, node_set_time_toolbox, node_set_name,};
 
@@ -146,15 +150,22 @@ static regex_t lsregx;
 static const char lsregx_str[] =
 	"^" R_TYPE R_MODE R_XMODE R_SPACE R_USR R_SPACE R_GRP R_SPACE R_SELINUX
 	R_SPACE R_NAME "$";
-static const handler_t lsregx_tbl[MATCH_NUM] = {NULL, node_set_type,
+static const handler_t lsregx_cb[MATCH_NUM] = {NULL, node_set_type,
 	node_set_mode, node_set_usr, node_set_grp, node_set_selinux,
 	node_set_name,};
 
-/* TODO: make table:
- *  - add new regex with regex_add_new()
- *  - use this order in parse()
- *  - use pointers from table to free regexes
- */
+static struct {
+	/* compiled regexp */
+	regex_t *reg;
+	/* string representation of regexp */
+	const char *str;
+	/* table of callback functions */
+	const handler_t *cb;
+} lsreg_tbl[] = {
+	{ &lsreg, lsreg_str, lsreg_cb },
+	{ &lsrega, lsrega_str, lsrega_cb },
+	{ &lsregx, lsregx_str, lsregx_cb },
+};
 
 /* FSM state */
 static int fsm_st;
@@ -710,22 +721,20 @@ static int chcwd(const char * const path)
 
 static int parse(char *line)
 {
-	size_t len;
+	size_t i;
 	int err;
 
-	/* TODO: make table */
-	err = parse_line(line, &lsreg, lsreg_tbl);
-	if (err != OK) {
-		err = parse_line(line, &lsrega, lsrega_tbl);
-	}
-	if (err != OK) {
-		err = parse_line(line, &lsregx, lsregx_tbl);
+	for (i = 0; i < ARRAY_SIZE(lsreg_tbl); i++) {
+		err = parse_line(line, lsreg_tbl[i].reg, lsreg_tbl[i].cb);
+		if (err == OK) {
+			break;
+		}
 	}
 
 	if (err != OK && is_dir(line)) {
 		/* remove last ':' */
-		len = strlen(line);
-		line[len - 1] = '\0';
+		i = strlen(line);
+		line[i - 1] = '\0';
 		chcwd(line);
 	}
 
@@ -849,6 +858,52 @@ static int process_file(const char *file)
 	close(fd);
 
 	return err;
+}
+
+static void parser_destroy(void)
+{
+	size_t i;
+
+	for (i = 0; i < ARRAY_SIZE(lsreg_tbl); i++) {
+		regfree(lsreg_tbl[i].reg);
+	}
+
+	if (str_ptr) {
+		free(str_ptr);
+	}
+}
+
+static int parser_init(void)
+{
+	int err = 0;
+	size_t i;
+
+	for (i = 0; i < ARRAY_SIZE(lsreg_tbl); i++) {
+		err = regcomp(lsreg_tbl[i].reg, lsreg_tbl[i].str, REG_EXTENDED);
+		if (err < 0) {
+			printf("Can't process regular expression #%u\n",
+				(unsigned int)i);
+			break;
+		}
+	}
+
+	if (err != 0) {
+		while (i > 0) {
+			--i;
+			regfree(lsreg_tbl[i].reg);
+		}
+		return ERR;
+	}
+
+	str_ptr = (char *)malloc(STR_BUFSIZ);
+	if (!str_ptr) {
+		printf("Can't allocate memory\n");
+		parser_destroy();
+		return ERR;
+	}
+	str_len = STR_BUFSIZ;
+
+	return OK;
 }
 
 static int fuse_getattr(const char *path, struct stat *stbuf)
@@ -1085,34 +1140,7 @@ int main(int argc, char **argv)
 		return 0;
 	}
 
-	/* allocate resources */
-	str_ptr = (char *)malloc(STR_BUFSIZ);
-	if (!str_ptr) {
-		printf("ERROR: can't allocate memory\n");
-		return 1;
-	}
-	str_len = STR_BUFSIZ;
-
-	/* TODO: make table */
-	err = regcomp(&lsreg, lsreg_str, REG_EXTENDED);
-	if (err < 0) {
-		printf("ERROR: can't process regular expression\n");
-		free(str_ptr);
-		return 1;
-	}
-	err = regcomp(&lsrega, lsrega_str, REG_EXTENDED);
-	if (err < 0) {
-		printf("ERROR: can't process regular expression\n");
-		free(str_ptr);
-		regfree(&lsreg);
-		return 1;
-	}
-	err = regcomp(&lsregx, lsregx_str, REG_EXTENDED);
-	if (err < 0) {
-		printf("ERROR: can't process regular expression\n");
-		free(str_ptr);
-		regfree(&lsreg);
-		regfree(&lsrega);
+	if (parser_init() != OK) {
 		return 1;
 	}
 
@@ -1123,7 +1151,7 @@ int main(int argc, char **argv)
 		clear_state();
 		err = process_file(argv[1]);
 		if (err != OK) {
-			printf("ERROR: can't process file %s\n", argv[1]);
+			printf("Can't process file %s\n", argv[1]);
 			break;
 		}
 		++argv;
@@ -1132,17 +1160,13 @@ int main(int argc, char **argv)
 
 	if (count == 0) {
 		/* stdin */
-		err = process_fd(0);
+		err = process_fd(STDIN_FILENO);
 		if (err != OK) {
-			printf("ERROR: can't process stdin\n");
+			printf("Can't process stdin\n");
 		}
 	}
 
-	/* TODO: make table */
-	regfree(&lsregx);
-	regfree(&lsrega);
-	regfree(&lsreg);
-	free(str_ptr);
+	parser_destroy();
 
 	if (err != OK) {
 		/* allocated memory will be freed on exit */
