@@ -177,9 +177,9 @@ static const handler_t lsregx_tbl[MATCH_NUM] = {NULL, node_set_type,
 /* FSM state */
 static int fsm_st;
 /* tmp buffer for processing files line by line */
-char *str_ptr;
-size_t str_len;
-int str_idx;
+static char *str_ptr;
+static size_t str_len;
+static size_t str_idx;
 
 static lsnode_t *node_alloc(void)
 {
