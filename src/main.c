@@ -363,23 +363,28 @@ static void node_set_grp(lsnode_t *node, const char * const group)
 static void node_set_size(lsnode_t *node, const char * const size)
 {
 	char *endptr = NULL;
-	long st_size;
+	long long st_size;
+	unsigned long st_rdev;
 
 	assert(size != NULL);
 
-	st_size = strtol(size, &endptr, 10);
+	st_size = strtoll(size, &endptr, 10);
 	assert(endptr != NULL);
 
 	if (*endptr == '\0') {
-		node->size = st_size;
+		node->size = (off_t)st_size;
 	} else if (*endptr == ',') {
 		/* assume this is major, minor */
-		/* TODO: handle incorrect strings */
-		if (st_size < (1 << 8)) {
-			node->rdev = st_size << 8;
-			st_size = strtol(endptr + 1, NULL, 10);
-			if (st_size < (1 << 8)) {
-				node->rdev |= st_size;
+		do {
+			++endptr;
+		} while (*endptr == ' ' || *endptr == '\t');
+
+		if (*endptr != '\0' && st_size < (1 << 8)) {
+			st_rdev = (unsigned long)st_size;
+			node->rdev = st_rdev << 8;
+			st_rdev = strtoul(endptr, &endptr, 10);
+			if (*endptr == '\0' && st_rdev < (1U << 8)) {
+				node->rdev |= st_rdev;
 			} else {
 				node->rdev = 0;
 			}
@@ -556,15 +561,15 @@ static void node_create_data(lsnode_t *node)
 				   "Mode: %s\n"
 				   "Owner: %s\n"
 				   "SELinux context: %s\n";
-	static const char units[] = {'K', 'M', 'G', 'T', 'P'};
+	static const char units[] = {'\0', 'K', 'M', 'G', 'T', 'P'};
 
 	char *mode;
 	char *owner;
 	char *selinux;
 	char size[8];
 	size_t n;
-	char sfx = 0;
 	size_t i;
+	off_t cut;
 
 	if (!node->name) {
 		return;
@@ -576,14 +581,13 @@ static void node_create_data(lsnode_t *node)
 		selinux = node->selinux;
 	}
 	
-	n = node->size;
+	cut = node->size;
 	i = 0;
-	while (n >= 10000 && i < ARRAY_SIZE(units)) {
-		n /= 1024;
-		sfx = units[i];
+	while (cut >= 10000 && i < ARRAY_SIZE(units)) {
+		cut /= 1024;
 		i++;
 	}
-	snprintf(size, sizeof(size), "%d%c", (int)n, sfx);
+	snprintf(size, sizeof(size), "%d%c", (int)cut, units[i]);
 
 	n = strlen(node->name) + strlen(size) + strlen(mode) + strlen(owner) +
 	    strlen(selinux) + sizeof(data) - 10;
