@@ -20,6 +20,8 @@
 #ifndef LS_FUSE_NODE_H
 #define LS_FUSE_NODE_H
 
+#include <sys/types.h>
+
 struct lsnode {
 	mode_t mode;
 	uid_t uid;
