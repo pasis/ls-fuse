@@ -204,7 +204,7 @@ static void node_set_type(lsnode_t *node, const char * const type)
 {
 	static const struct {
 		char key;
-		int value;
+		mode_t value;
 	} type_map[] = {
 		{'-', S_IFREG},
 		{'b', S_IFBLK},
@@ -216,7 +216,7 @@ static void node_set_type(lsnode_t *node, const char * const type)
 	};
 
 	size_t i;
-	int s_if;
+	mode_t s_if;
 	char c;
 
 	assert(type != NULL);
@@ -238,7 +238,7 @@ static void node_set_type(lsnode_t *node, const char * const type)
 
 	/* TODO: check if file type is set and whether it equals to s_if
 	 *       (for multiple files support)*/
-	if (s_if) {
+	if (s_if != 0) {
 		node->mode |= s_if;
 		if ((s_if & S_IFDIR) == S_IFDIR) {
 			cwd->ndir++;
@@ -739,13 +739,14 @@ static int parse(char *line)
 		/* remove last ':' */
 		i = strlen(line);
 		line[i - 1] = '\0';
+		/* TODO: check return value */
 		chcwd(line);
 	}
 
 	return OK;
 }
 
-static int buf_to_str(const char *buf, int start, int end)
+static int buf_to_str(const char *buf, size_t start, size_t end)
 {
 	size_t len;
 	void *tmp_ptr;
@@ -771,7 +772,7 @@ static int process_buf(const char *buf, size_t size)
 {
 	size_t i;
 	char c;
-	int last = 0;
+	size_t last = 0;
 	int err;
 
 	assert(size != 0);
@@ -1056,20 +1057,22 @@ static int fuse_read(const char *path, char *buf, size_t size, off_t offset,
 
 	memcpy(buf, ptr, len);
 
-	return len;
+	return (int)len;
 }
 
 static int fuse_listxattr(const char *path, char *buf, size_t size)
 {
+	size_t xattr_len = sizeof(SELINUX_XATTR);
+
 	(void)path;
 
-	if (size < sizeof(SELINUX_XATTR)) {
+	if (size < xattr_len) {
 		return -ERANGE;
 	}
 
-	strcpy(buf, SELINUX_XATTR);
+	strncpy(buf, SELINUX_XATTR, xattr_len);
 
-	return sizeof(SELINUX_XATTR);
+	return (int)xattr_len;
 }
 
 static int fuse_getxattr(const char *path, const char *name, char *buf,
@@ -1129,7 +1132,7 @@ static struct fuse_operations fuse_oper = {
 
 int main(int argc, char **argv)
 {
-	int err;
+	int err = OK;
 	int count;
 
 	if (argc < 2) {
