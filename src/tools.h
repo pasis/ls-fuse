@@ -1,4 +1,4 @@
-/* node.h
+/* tools.h
  * ls-fuse - ls -lR output mounter
  *
  * Copyright (C) 2013 Dmitry Podgorny <pasis.ua@gmail.com>
@@ -17,36 +17,24 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef LS_FUSE_NODE_H
-#define LS_FUSE_NODE_H
+#ifndef LS_FUSE_TOOLS_H
+#define LS_FUSE_TOOLS_H
 
-#include <sys/types.h>
+#define ERR 1
+#define OK 0
 
-struct lsnode {
-	mode_t mode;
-	uid_t uid;
-	gid_t gid;
-	off_t size;
-	dev_t rdev;
-	int month;
-	time_t time;
-	char *selinux;
-	char *name;
-	char *data;
-	/* number of subdirectories */
-	int ndir;
-	struct lsnode *entry;
-	struct lsnode *next;
-};
+#ifndef FALSE
+#define FALSE 0
+#endif
 
-typedef struct lsnode lsnode_t;
-typedef void (*handler_t)(lsnode_t *, const char *);
+#ifndef TRUE
+#define TRUE 1
+#endif
 
-extern lsnode_t root;
+#ifndef NULL
+#define NULL ((void*)0)
+#endif
 
-lsnode_t *node_alloc(void);
-void node_free(lsnode_t *node);
-lsnode_t *node_from_path(const char * const path);
-void node_create_data(lsnode_t *node);
+#define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
 
-#endif /* LS_FUSE_NODE_H */
+#endif /* LS_FUSE_TOOLS_H */
