@@ -1180,5 +1180,5 @@ int main(int argc, char **argv)
 		return 2;
 	}
 
-	return fuse_main(argc, argv, &fuse_oper);
+	return fuse_main(argc, argv, &fuse_oper, NULL);
 }

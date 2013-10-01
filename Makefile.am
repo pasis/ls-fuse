@@ -1,4 +1,4 @@
-AM_CFLAGS = -DFUSE_USE_VERSION=22
+AM_CFLAGS = -DFUSE_USE_VERSION=26
 
 ## Main build targets
 bin_PROGRAMS = ls-fuse
