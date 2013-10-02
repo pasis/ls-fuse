@@ -48,12 +48,21 @@ following commands:
 
 [2]: https://sourceforge.net/projects/lsfuse
 
+## ANDROID
+
+ls-fuse works on Android as native tool. Tested with [fuse-android][3].
+Note, ls-fuse required access to /dev/fuse.
+
+[3]: https://github.com/seth-hg/fuse-android
+
 ## INSTALLING
 
 Gentoo users can install ls-fuse package from 'stuff' overlay:
 
 	layman -a stuff
 	emerge ls-fuse
+
+Packages for RPM-based distributions can be found at [sourceforge page][2].
 
 For other Linux distributions or operating systems just run as root (after
 building from sources of course):
