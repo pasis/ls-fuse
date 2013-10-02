@@ -51,7 +51,7 @@ following commands:
 ## ANDROID
 
 ls-fuse works on Android as native tool. Tested with [fuse-android][3].
-Note, ls-fuse required access to /dev/fuse.
+Note, ls-fuse requires access to /dev/fuse.
 
 [3]: https://github.com/seth-hg/fuse-android
 
