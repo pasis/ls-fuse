@@ -42,10 +42,9 @@ struct lsnode {
 typedef struct lsnode lsnode_t;
 typedef void (*handler_t)(lsnode_t *, const char *);
 
-extern lsnode_t root;
-
 lsnode_t *node_alloc(void);
 void node_free(lsnode_t *node);
+lsnode_t *node_get_root(void);
 lsnode_t *node_from_path(const char * const path);
 void node_create_data(lsnode_t *node);
 

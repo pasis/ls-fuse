@@ -27,13 +27,10 @@
 #include "node.h"
 #include "tools.h"
 
-lsnode_t root = {
+static lsnode_t root = {
 	.mode = S_IFDIR | 0755,
 	.name = "/",
 };
-
-/* XXX: temporary solution */
-extern lsnode_t *cwd;
 
 lsnode_t *node_alloc(void)
 {
@@ -43,16 +40,23 @@ lsnode_t *node_alloc(void)
 	}
 
 	memset(node, 0, sizeof(lsnode_t));
-	node->next = cwd->entry;
-	cwd->entry = node;
 
 	return node;
 }
 
 void node_free(lsnode_t *node)
 {
-	(void)node;
-	/* TODO */
+	if (node != NULL) {
+		free(node->selinux);
+		free(node->name);
+		free(node->data);
+		free(node);
+	}
+}
+
+lsnode_t *node_get_root(void)
+{
+	return &root;
 }
 
 /* node_create_data must be thread safe */
@@ -111,7 +115,7 @@ lsnode_t *node_from_path(const char * const path)
 	char *saveptr = NULL;
 	int found;
 
-	parent = &root;
+	parent = node_get_root();
 	tok = strtok_r(tmp, "/", &saveptr);
 
 	while (tok) {

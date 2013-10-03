@@ -77,8 +77,7 @@ static void node_set_date_toolbox(lsnode_t *, const char *);
 static void node_set_selinux(lsnode_t *, const char *);
 static void node_set_name(lsnode_t *, const char *);
 
-/* XXX: temporary not static */
-lsnode_t *cwd = &root;
+static lsnode_t *cwd;
 
 static hash_tbl_t hash_usr;
 static hash_tbl_t hash_grp;
@@ -156,6 +155,19 @@ static char *str_ptr;
 static size_t str_len;
 static size_t str_idx;
 
+static int node_insert(lsnode_t *node)
+{
+	assert(cwd != NULL);
+
+	/* TODO: check whether node exists in the cwd
+	 *       if yes, add absent information*/
+
+	node->next = cwd->entry;
+	cwd->entry = node;
+
+	return OK;
+}
+
 static void node_set_type(lsnode_t *node, const char * const type)
 {
 	static const struct {
@@ -176,6 +188,7 @@ static void node_set_type(lsnode_t *node, const char * const type)
 	char c;
 
 	assert(type != NULL);
+	assert(cwd != NULL);
 	assert((node->mode & S_IFMT) == 0);
 
 	if (strlen(type) != 1) {
@@ -548,6 +561,11 @@ static int parse_line(const char * const s, const regex_t * const reg,
 		}
 	}
 
+	if (node_insert(node) != OK) {
+		/* this object already exists in the tree */
+		node_free(node);
+	}
+
 	return OK;
 }
 
@@ -685,7 +703,7 @@ static int process_buf(const char * const buf, size_t size)
 
 static void clear_state(void)
 {
-	cwd = &root;
+	cwd = node_get_root();
 	fsm_st = 0;
 	str_idx = 0;
 }
