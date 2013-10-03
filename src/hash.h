@@ -104,4 +104,20 @@ static inline long hash_get(const hash_tbl_t tbl, const char *key)
 	return -1;
 }
 
+static inline void hash_destroy(hash_tbl_t tbl)
+{
+	unsigned int i;
+	hash_t *h;
+	hash_t *next;
+
+	for (i = 0; i < HASH_TBL_SIZE; i++) {
+		h = tbl[i].next;
+		while (h != NULL) {
+			next = h->next;
+			free(h);
+			h = next;
+		}
+	}
+}
+
 #endif /* LS_FUSE_HASH_H */

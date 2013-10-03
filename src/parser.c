@@ -800,4 +800,7 @@ void parser_destroy(void)
 	if (str_ptr) {
 		free(str_ptr);
 	}
+
+	hash_destroy(hash_usr);
+	hash_destroy(hash_grp);
 }
