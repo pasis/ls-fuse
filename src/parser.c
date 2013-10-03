@@ -25,6 +25,7 @@
 #include <unistd.h>
 
 #include <assert.h>
+#include <errno.h>
 #include <regex.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -36,6 +37,7 @@
 #include "node.h"
 #include "parser.h"
 #include "tools.h"
+#include "log.h"
 
 #define MAX_READ_BUFSIZ (1024 * 1024)
 #define STR_BUFSIZ 4096
@@ -515,13 +517,11 @@ static int parse_line(const char * const s, const regex_t * const reg,
 	char tmp[len + 1];
 	lsnode_t *node;
 
-#ifdef DEBUG
-	printf("parsing: %s\n", s); /* debug */
-#endif /* DEBUG */
-
 	if (regexec(reg, s, MATCH_NUM, match, 0) == REG_NOMATCH ) {
 		return ERR;
 	}
+
+	LOGD("parsed: %s", s);
 
 	node = node_alloc();
 	if (!node) {
@@ -540,9 +540,7 @@ static int parse_line(const char * const s, const regex_t * const reg,
 			strncpy(tmp, &s[match[i].rm_so], sub_len);
 			tmp[sub_len] = '\0';
 
-#ifdef DEBUG
-			printf("%d: %s\n", i, tmp); /* debug */
-#endif /* DEBUG */
+			LOGD("%d: %s", i, tmp);
 
 			if (h_tbl[i] != NULL) {
 				h_tbl[i](node, tmp);
@@ -597,12 +595,16 @@ static int parse(char *line)
 		}
 	}
 
-	if (err != OK && is_dir(line)) {
-		/* remove last ':' */
-		i = strlen(line);
-		line[i - 1] = '\0';
-		/* TODO: check return value */
-		chcwd(line);
+	if (err != OK) {
+		if (is_dir(line)) {
+			/* remove last ':' */
+			i = strlen(line);
+			line[i - 1] = '\0';
+			/* TODO: check return value */
+			chcwd(line);
+		} else {
+			LOGD("not parsed: %s", line);
+		}
 	}
 
 	return OK;
@@ -700,7 +702,7 @@ int parse_fd(int fd)
 	while (1) {
 		size = read(fd, buf, sizeof(buf));
 		if (size < 0) {
-			perror("read");
+			LOGE("read: %s", strerror(errno));
 			break;
 		}
 
@@ -726,7 +728,7 @@ int parse_file(const char * const file)
 
 	fd = open(file, O_RDONLY | O_CLOEXEC);
 	if (fd < 0) {
-		perror("open");
+		LOGE("open: %s", strerror(errno));
 		return ERR;
 	}
 
@@ -744,8 +746,8 @@ int parser_init(void)
 	for (i = 0; i < ARRAY_SIZE(lsreg_tbl); i++) {
 		err = regcomp(lsreg_tbl[i].reg, lsreg_tbl[i].str, REG_EXTENDED);
 		if (err < 0) {
-			printf("Can't process regular expression #%u\n",
-				(unsigned int)i);
+			LOGE("Can't process regular expression #%u",
+			     (unsigned int)i);
 			break;
 		}
 	}
@@ -760,7 +762,7 @@ int parser_init(void)
 
 	str_ptr = (char *)malloc(STR_BUFSIZ);
 	if (!str_ptr) {
-		printf("Can't allocate memory\n");
+		LOGE("Can't allocate memory");
 		parser_destroy();
 		return ERR;
 	}

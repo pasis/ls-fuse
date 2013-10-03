@@ -27,6 +27,7 @@
 #include "node.h"
 #include "parser.h"
 #include "tools.h"
+#include "log.h"
 
 #ifndef STDIN_FILENO
 #define STDIN_FILENO 0
@@ -67,7 +68,7 @@ int main(int argc, char **argv)
 		++count;
 		err = parse_file(argv[1]);
 		if (err != OK) {
-			printf("Can't process file %s\n", argv[1]);
+			LOGE("Can't process file %s", argv[1]);
 			break;
 		}
 		++argv;
@@ -77,7 +78,7 @@ int main(int argc, char **argv)
 	if (count == 0) {
 		err = parse_fd(STDIN_FILENO);
 		if (err != OK) {
-			printf("Can't process <stdin>\n");
+			LOGE("Can't process <stdin>");
 		}
 	}
 
