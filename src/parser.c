@@ -155,15 +155,15 @@ static char *str_ptr;
 static size_t str_len;
 static size_t str_idx;
 
-static int node_insert(lsnode_t *node)
+static int node_insert(lsnode_t *parent, lsnode_t *node)
 {
 	assert(cwd != NULL);
 
 	/* TODO: check whether node exists in the cwd
 	 *       if yes, add absent information*/
 
-	node->next = cwd->entry;
-	cwd->entry = node;
+	node->next = parent->entry;
+	parent->entry = node;
 
 	return OK;
 }
@@ -561,7 +561,7 @@ static int parse_line(const char * const s, const regex_t * const reg,
 		}
 	}
 
-	if (node_insert(node) != OK) {
+	if (node_insert(cwd, node) != OK) {
 		/* this object already exists in the tree */
 		node_free(node);
 	}
@@ -587,14 +587,90 @@ static int is_dir(const char * const s)
 	return FALSE;
 }
 
+static lsnode_t *create_fake_dir(const char * const name)
+{
+	lsnode_t *node;
+	
+	node = node_alloc();
+	if (!node) {
+		return NULL;
+	}
+	node_set_name(node, name);
+	node_set_type(node, "d");
+	node_set_mode(node, "rwxr-xr-x");
+
+	return node;
+}
+
+static lsnode_t *create_path(const char * const path)
+{
+	lsnode_t *parent;
+	lsnode_t *node = NULL;
+	lsnode_t *result = NULL;
+	char *tmp = strdup(path);
+	char *name;
+	size_t len;
+
+	len = strlen(tmp);
+
+	while (1) {
+		while (len > 0 && tmp[len - 1] == '/') {
+			tmp[len - 1] = '\0';
+			--len;
+		}
+
+		if (len == 0) {
+			parent = node_get_root();
+		} else {
+			parent = node_from_path(tmp);
+		}
+
+		if (parent) {
+			if (!result) {
+				result = parent;
+			} else {
+				node_insert(parent, node);
+			}
+			break;
+		}
+
+		while (len > 0 && tmp[len - 1] != '/') {
+			--len;
+		}
+		if (len > 0) {
+			tmp[len - 1] = '\0';
+		}
+		name = &tmp[len];
+
+		parent = create_fake_dir(name);
+		if (!parent) {
+			result = NULL;
+			break;
+		}
+
+		if (node) {
+			node_insert(parent, node);
+		} else {
+			result = parent;
+		}
+
+		node = parent;
+	}
+
+	free(tmp);
+	return result;
+}
+
 static int chcwd(const char * const path)
 {
 	lsnode_t *node;
 
 	node = node_from_path(path);
 	if (!node) {
-		/* TODO: create all nodes with standard values for a dir */
-		return ERR;
+		node = create_path(path);
+		if (!node) {
+			return ERR;
+		}
 	}
 
 	cwd = node;
@@ -618,8 +694,9 @@ static int parse(char *line)
 			/* remove last ':' */
 			i = strlen(line);
 			line[i - 1] = '\0';
-			/* TODO: check return value */
-			chcwd(line);
+			if (chcwd(line) != OK) {
+				return ERR;
+			}
 		} else {
 			LOGD("not parsed: %s", line);
 		}
@@ -674,7 +751,7 @@ static int process_buf(const char * const buf, size_t size)
 				str_ptr[str_idx] = '\0';
 				err = parse(str_ptr);
 				if (err != OK) {
-					/* only warning */
+					return err;
 				}
 				str_idx = 0;
 			}
