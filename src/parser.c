@@ -634,13 +634,15 @@ static lsnode_t *create_path(const char * const path)
 			break;
 		}
 
-		while (len > 0 && tmp[len - 1] != '/') {
-			--len;
+		name = strrchr(tmp, '/');
+		if (!name) {
+			len = 0;
+			name = tmp;
+		} else {
+			len = (size_t)(name - tmp);
+			*name = '\0';
+			++name;
 		}
-		if (len > 0) {
-			tmp[len - 1] = '\0';
-		}
-		name = &tmp[len];
 
 		parent = create_fake_dir(name);
 		if (!parent) {
