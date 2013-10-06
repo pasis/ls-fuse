@@ -219,7 +219,7 @@ static int fuse_getxattr(const char *path, const char *name, char *buf,
 		return -ERANGE;
 	}
 
-	strcpy(buf, node->selinux);
+	strncpy(buf, node->selinux, size);
 
 	return len + 1;
 }

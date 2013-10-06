@@ -74,7 +74,7 @@ void node_create_data(lsnode_t *node)
 	char *selinux;
 	char size[8];
 	size_t n;
-	size_t i;
+	int i;
 	off_t cut;
 
 	if (!node->name) {
@@ -88,20 +88,31 @@ void node_create_data(lsnode_t *node)
 	}
 	
 	cut = node->size;
-	i = 0;
-	while (cut >= 10000 && i < ARRAY_SIZE(units)) {
+	n = 0;
+	while (cut >= 10000 && n < ARRAY_SIZE(units)) {
 		cut /= 1024;
-		i++;
+		n++;
 	}
-	snprintf(size, sizeof(size), "%d%c", (int)cut, units[i]);
+	i = snprintf(size, sizeof(size), "%d%c", (int)cut, units[n]);
+	if (i < 0 || i >= (int)sizeof(size)) {
+		strncpy(size, "NaN", sizeof(size) - 1);
+		size[sizeof(size) - 1] = '\0';
+	}
 
 	n = strlen(node->name) + strlen(size) + strlen(mode) + strlen(owner) +
 	    strlen(selinux) + sizeof(data) - 10;
 
+	if (node->data) {
+		free(node->data);
+	}
 	node->data = malloc(n);
 	if (node->data != NULL) {
-		snprintf(node->data, n, data, node->name, size, mode, owner,
-			 selinux);
+		i = snprintf(node->data, n, data, node->name, size, mode, owner,
+			     selinux);
+		if (i != (int)n - 1) {
+			free(node->data);
+			node->data = NULL;
+		}
 	}
 }
 
@@ -113,7 +124,6 @@ lsnode_t *node_from_path(const char * const path)
 	char *tmp = strdup(path);
 	char *tok;
 	char *saveptr = NULL;
-	int found;
 
 	parent = node_get_root();
 	tok = strtok_r(tmp, "/", &saveptr);
@@ -125,18 +135,16 @@ lsnode_t *node_from_path(const char * const path)
 			/* TODO: not implemented yet (doubly linked list?) */
 		} else {
 			node = parent->entry;
-			found = FALSE;
+			parent = NULL;
 			while (node) {
 				if (node->name && !strcmp(tok, node->name)) {
-					found = TRUE;
 					parent = node;
 					break;
 				}
 				node = node->next;
 			}
 
-			if (!found) {
-				parent = NULL;
+			if (!parent) {
 				break;
 			}
 		}
