@@ -543,9 +543,6 @@ static int parse_line(const char * const s, const regex_t * const reg,
 
 	for (i = 1; i < MATCH_NUM; i++) {
 		if (match[i].rm_so >= 0 && match[i].rm_eo >= match[i].rm_so) {
-			/* TODO: after debug removing make tmp string only
-			 *       when h_tbl[i] != NULL
-			 */
 			sub_len = match[i].rm_eo - match[i].rm_so;
 			if (sub_len > len) {
 				continue;
