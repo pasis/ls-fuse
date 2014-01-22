@@ -37,12 +37,12 @@ Obtain the latest sources from git repo:
 
 Also you can get the latest stable tarball at [sourceforge page][2].
 
-If you got sources from git repo you need to run bootstrap.sh script at first.
+If you got sources from git repo you need to run autogen.sh script at first.
 It generates configure script. For stable tarballs you already have the
 configure script and don't have to generate it. To build ls-fuse run the
 following commands:
 
-	./bootstrap.sh
+	./autogen.sh
 	./configure
 	make
 
