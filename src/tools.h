@@ -23,14 +23,6 @@
 #define ERR 1
 #define OK 0
 
-#ifndef FALSE
-#define FALSE 0
-#endif
-
-#ifndef TRUE
-#define TRUE 1
-#endif
-
 #ifndef NULL
 #define NULL ((void*)0)
 #endif

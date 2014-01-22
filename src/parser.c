@@ -27,6 +27,7 @@
 #include <assert.h>
 #include <errno.h>
 #include <regex.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -566,7 +567,7 @@ static int parse_line(const char * const s, const regex_t * const reg,
 	return OK;
 }
 
-static int is_dir(const char * const s)
+static bool is_dir(const char * const s)
 {
 	size_t len;
 
@@ -574,14 +575,10 @@ static int is_dir(const char * const s)
 
 	len = strlen(s);
 	if (len < 2) {
-		return FALSE;
+		return false;
 	}
 
-	if (s[len - 1] == ':') {
-		return TRUE;
-	}
-
-	return FALSE;
+	return s[len - 1] == ':';
 }
 
 static lsnode_t *create_fake_dir(const char * const name)
