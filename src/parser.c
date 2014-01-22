@@ -613,11 +613,7 @@ static lsnode_t *create_path(const char * const path)
 			--len;
 		}
 
-		if (len == 0) {
-			parent = node_get_root();
-		} else {
-			parent = node_from_path(tmp);
-		}
+		parent = len == 0 ? node_get_root() : node_from_path(tmp);
 
 		if (parent) {
 			if (!result) {
