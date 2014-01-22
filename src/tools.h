@@ -20,9 +20,6 @@
 #ifndef LS_FUSE_TOOLS_H
 #define LS_FUSE_TOOLS_H
 
-#define ERR 1
-#define OK 0
-
 #ifndef NULL
 #define NULL ((void*)0)
 #endif

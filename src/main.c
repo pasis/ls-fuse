@@ -43,7 +43,7 @@ static void usage(const char * const name)
 
 int main(int argc, char **argv)
 {
-	int err = OK;
+	int err = 0;
 	int count;
 
 	if (argc < 2) {
@@ -58,7 +58,7 @@ int main(int argc, char **argv)
 		return 0;
 	}
 
-	if (parser_init() != OK) {
+	if (parser_init() != 0) {
 		return 1;
 	}
 
@@ -67,7 +67,7 @@ int main(int argc, char **argv)
 		/* if parse_file() fails count still will be increased */
 		++count;
 		err = parse_file(argv[1]);
-		if (err != OK) {
+		if (err != 0) {
 			LOGE("Can't process file %s", argv[1]);
 			break;
 		}
@@ -77,14 +77,14 @@ int main(int argc, char **argv)
 
 	if (count == 0) {
 		err = parse_fd(STDIN_FILENO);
-		if (err != OK) {
+		if (err != 0) {
 			LOGE("Can't process <stdin>");
 		}
 	}
 
 	parser_destroy();
 
-	if (err != OK) {
+	if (err != 0) {
 		/* allocated memory will be freed on exit */
 		return 2;
 	}

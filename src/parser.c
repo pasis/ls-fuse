@@ -156,17 +156,19 @@ static char *str_ptr;
 static size_t str_len;
 static size_t str_idx;
 
-static int node_insert(lsnode_t *parent, lsnode_t *node)
+static bool node_insert(lsnode_t *parent, lsnode_t *node)
 {
 	assert(cwd != NULL);
 
-	/* TODO: check whether node exists in the cwd
-	 *       if yes, add absent information*/
+	/*
+	 * TODO: check whether node exists in the cwd
+	 *       if yes, add absent information
+	 */
 
 	node->next = parent->entry;
 	parent->entry = node;
 
-	return OK;
+	return true;
 }
 
 static void node_set_type(lsnode_t *node, const char * const type)
@@ -531,15 +533,15 @@ static int parse_line(const char * const s, const regex_t * const reg,
 	char tmp[len + 1];
 	lsnode_t *node;
 
-	if (regexec(reg, s, MATCH_NUM, match, 0) == REG_NOMATCH ) {
-		return ERR;
+	if (regexec(reg, s, MATCH_NUM, match, 0) == REG_NOMATCH) {
+		return -EINVAL;
 	}
 
 	LOGD("parsed: %s", s);
 
 	node = node_alloc();
 	if (!node) {
-		return ERR;
+		return -ENOMEM;
 	}
 
 	for (i = 1; i < MATCH_NUM; i++) {
@@ -559,12 +561,12 @@ static int parse_line(const char * const s, const regex_t * const reg,
 		}
 	}
 
-	if (node_insert(cwd, node) != OK) {
+	if (!node_insert(cwd, node)) {
 		/* this object already exists in the tree */
 		node_free(node);
 	}
 
-	return OK;
+	return 0;
 }
 
 static bool is_dir(const char * const s)
@@ -661,12 +663,12 @@ static int chcwd(const char * const path)
 	if (!node) {
 		node = create_path(path);
 		if (!node) {
-			return ERR;
+			return -ENOMEM;
 		}
 	}
 
 	cwd = node;
-	return OK;
+	return 0;
 }
 
 static int parse(char *line)
@@ -676,25 +678,26 @@ static int parse(char *line)
 
 	for (i = 0; i < ARRAY_SIZE(lsreg_tbl); i++) {
 		err = parse_line(line, lsreg_tbl[i].reg, lsreg_tbl[i].cb);
-		if (err == OK) {
-			break;
+		if (err == 0) {
+			return 0;
 		}
 	}
 
-	if (err != OK) {
-		if (is_dir(line)) {
-			/* remove last ':' */
-			i = strlen(line);
-			line[i - 1] = '\0';
-			if (chcwd(line) != OK) {
-				return ERR;
-			}
-		} else {
-			LOGD("not parsed: %s", line);
-		}
+	if (is_dir(line)) {
+		/* remove last ':' */
+		i = strlen(line);
+		line[i - 1] = '\0';
+		err = chcwd(line);
+	} else {
+		LOGD("not parsed: %s", line);
+		/*
+		 * ls-lR output can contain some extra output that should be
+		 * ignored. Just return success in this case.
+		 */
+		err = 0;
 	}
 
-	return OK;
+	return err;
 }
 
 static int buf_to_str(const char * const buf, size_t start, size_t end)
@@ -707,7 +710,7 @@ static int buf_to_str(const char * const buf, size_t start, size_t end)
 	if (str_len - str_idx <= len) {
 		tmp_ptr = realloc(str_ptr, str_len + len + 1);
 		if (!tmp_ptr) {
-			return ERR;
+			return -ENOMEM;
 		}
 		str_ptr = (char *)tmp_ptr;
 		str_len += len + 1;
@@ -716,7 +719,7 @@ static int buf_to_str(const char * const buf, size_t start, size_t end)
 	memcpy(str_ptr + str_idx, buf + start, len);
 	str_idx += len;
 
-	return OK;
+	return 0;
 }
 
 static int process_buf(const char * const buf, size_t size)
@@ -737,12 +740,12 @@ static int process_buf(const char * const buf, size_t size)
 				assert(str_idx < str_len);
 				fsm_st = 1;
 				err = buf_to_str(buf, last, i);
-				if (err != OK) {
+				if (err != 0) {
 					return err;
 				}
 				str_ptr[str_idx] = '\0';
 				err = parse(str_ptr);
-				if (err != OK) {
+				if (err != 0) {
 					return err;
 				}
 				str_idx = 0;
@@ -762,12 +765,12 @@ static int process_buf(const char * const buf, size_t size)
 
 	if (fsm_st == 0) {
 		err = buf_to_str(buf, last, size);
-		if (err != OK) {
+		if (err != 0) {
 			return err;
 		}
 	}
 
-	return OK;
+	return 0;
 }
 
 static void clear_state(void)
@@ -781,31 +784,31 @@ int parse_fd(int fd)
 {
 	ssize_t size;
 	char buf[MAX_READ_BUFSIZ];
-	int err;
-	int result = ERR;
+	int err = 0;
 
 	clear_state();
 
 	while (1) {
+		/* TODO: handle EINTR */
 		size = read(fd, buf, sizeof(buf));
 		if (size < 0) {
 			LOGE("read: %s", strerror(errno));
+			err = -errno;
 			break;
 		}
 
 		if (size == 0) {
 			/* EOF */
-			result = OK;
 			break;
 		}
 
 		err = process_buf(buf, (size_t)size);
-		if (err != OK) {
+		if (err != 0) {
 			break;
 		}
 	}
 
-	return result;
+	return err;
 }
 
 int parse_file(const char * const file)
@@ -816,7 +819,7 @@ int parse_file(const char * const file)
 	fd = open(file, O_RDONLY | O_CLOEXEC);
 	if (fd < 0) {
 		LOGE("open: %s", strerror(errno));
-		return ERR;
+		return -errno;
 	}
 
 	err = parse_fd(fd);
@@ -844,18 +847,18 @@ int parser_init(void)
 			--i;
 			regfree(lsreg_tbl[i].reg);
 		}
-		return ERR;
+		return -ENOMEM;
 	}
 
 	str_ptr = (char *)malloc(STR_BUFSIZ);
 	if (!str_ptr) {
 		LOGE("Can't allocate memory");
 		parser_destroy();
-		return ERR;
+		return -ENOMEM;
 	}
 	str_len = STR_BUFSIZ;
 
-	return OK;
+	return 0;
 }
 
 void parser_destroy(void)
