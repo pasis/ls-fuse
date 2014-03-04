@@ -1,5 +1,5 @@
 AC_INIT([ls-fuse], [0.3dev], [pasis.ua@gmail.com])
-AM_INIT_AUTOMAKE([foreign])
+AM_INIT_AUTOMAKE([foreign subdir-objects])
 
 AC_CONFIG_FILES([Makefile])
 
