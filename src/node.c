@@ -34,12 +34,10 @@ static lsnode_t root = {
 
 lsnode_t *node_alloc(void)
 {
-	lsnode_t *node = malloc(sizeof(lsnode_t));
-	if (!node) {
-		return NULL;
+	lsnode_t *node = malloc(sizeof(*node));
+	if (node) {
+		memset(node, 0, sizeof(*node));
 	}
-
-	memset(node, 0, sizeof(lsnode_t));
 
 	return node;
 }
