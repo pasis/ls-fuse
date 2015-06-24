@@ -1,7 +1,7 @@
 
 		Changes for ls-fuse
 
-Changes in 0.3 (TBA)
+Changes in 0.3 (25 Jun 2015)
 - Android support
 - Added support of Android's toolbox output
 - Added support of files larger than 2GB on 32bit systems

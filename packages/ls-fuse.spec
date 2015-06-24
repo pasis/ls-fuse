@@ -1,4 +1,4 @@
-%define ls_fuse_version 0.2
+%define ls_fuse_version 0.3
 
 Name:		ls-fuse
 Version:	%{ls_fuse_version}
