@@ -93,8 +93,7 @@ void node_create_data(lsnode_t *node)
 	}
 	i = snprintf(size, sizeof(size), "%d%c", (int)cut, units[n]);
 	if (i < 0 || i >= (int)sizeof(size)) {
-		strncpy(size, "NaN", sizeof(size) - 1);
-		size[sizeof(size) - 1] = '\0';
+		snprintf(size, sizeof(size), "NaN");
 	}
 
 	n = strlen(node->name) + strlen(size) + strlen(mode) + strlen(owner) +
