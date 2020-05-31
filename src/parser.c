@@ -481,6 +481,10 @@ static void node_set_date_toolbox(lsnode_t *node, const char * const date)
 		return;
 	}
 
+	/* according to mktime(3), tm_year is "Year - 1900" */
+	assert(t.tm_year > 1900);
+	t.tm_year -= 1900;
+
 	unix_time = mktime(&t);
 	if (unix_time >= 0) {
 		node->time += unix_time;
