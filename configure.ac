@@ -14,7 +14,7 @@ LIBS="$LIBS $fuse_LIBS"
 CFLAGS="$CFLAGS $fuse_CFLAGS"
 
 if test "x$enable_debug" = xyes; then
-	CFLAGS="$CFLAGS -Wall -Wunused -DDEBUG"
+	CFLAGS="$CFLAGS -Wall -Wunused -DDEBUG -O0 -g3"
 else
 	CFLAGS="$CFLAGS -DNDEBUG"
 fi
